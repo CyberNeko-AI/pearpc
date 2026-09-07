@@ -154,6 +154,42 @@ void gen_cr_insert_unsigned(JITC &jitc, int crfD)
     jitc.asmSTRw_cpu(W1, offsetof(PPC_CPU_State, cr));
 }
 
+static inline bool can_defer_flags(JITC &jitc, PPC_CRx cr)
+{
+    if (!jitc.currentPhysPage) {
+        return false;
+    }
+    uint32 nextOfs = jitc.pc + 4;
+    if (nextOfs >= 4096) {
+        return false;
+    }
+    if (jitc.currentCFG && jitc.currentCFG->blockAtOfs[nextOfs / 4] >= 0) {
+        return false;
+    }
+    uint32 nextOpc = ppc_word_from_BE(*(uint32 *)&jitc.currentPhysPage[nextOfs]);
+    if ((nextOpc >> 26) != 16) {
+        return false; // Opcode 16: bc
+    }
+    if (nextOpc & 1) {
+        return false; // LK=1 not supported by fast path
+    }
+    uint32 BO = (nextOpc >> 21) & 0x1f;
+    uint32 BI = (nextOpc >> 16) & 0x1f;
+    if (!(BO & 4)) {
+        return false; // CTR decrement not supported by fast path
+    }
+    if (BO & 16) {
+        return false; // Condition always true, doesn't test CR
+    }
+    if ((BI / 4) != (uint32)cr) {
+        return false; // Tests a different CR field
+    }
+    if ((BI % 4) == 3) {
+        return false; // Tests SO bit
+    }
+    return true;
+}
+
 /*
  *  Helper: emit CR0 update for result in a given register.
  *  CR0 = bits [31:28] of cr register.
@@ -163,7 +199,11 @@ static void gen_update_cr0(JITC &jitc, NativeReg resultReg = W16)
 {
     jitc.clobberFlags();
     jitc.asmCMPw(resultReg, (uint32)0);
-    jitc.mapFlagsDirty(PPC_CR0, true);
+    if (can_defer_flags(jitc, PPC_CR0)) {
+        jitc.mapFlagsDirty(PPC_CR0, true);
+    } else {
+        gen_cr_insert_signed(jitc, 0);
+    }
 }
 
 /*
@@ -271,7 +311,11 @@ JITCFlow ppc_opc_gen_cmpi(JITC &jitc)
         jitc.asmMOV(W17, (uint32)imm);
         jitc.asmCMPw(W16, W17);
     }
-    jitc.mapFlagsDirty((PPC_CRx)crfD, true);
+    if (can_defer_flags(jitc, (PPC_CRx)crfD)) {
+        jitc.mapFlagsDirty((PPC_CRx)crfD, true);
+    } else {
+        gen_cr_insert_signed(jitc, crfD);
+    }
     return flowContinue;
 }
 
@@ -1013,7 +1057,11 @@ JITCFlow ppc_opc_gen_cmp(JITC &jitc)
     jitc.asmLDRw_cpu(W16, GPR_OFS(rA));
     jitc.asmLDRw_cpu(W17, GPR_OFS(rB));
     jitc.asmCMPw(W16, W17);
-    jitc.mapFlagsDirty((PPC_CRx)cr, true);
+    if (can_defer_flags(jitc, (PPC_CRx)cr)) {
+        jitc.mapFlagsDirty((PPC_CRx)cr, true);
+    } else {
+        gen_cr_insert_signed(jitc, (int)cr);
+    }
     return flowContinue;
 }
 
@@ -1030,7 +1078,11 @@ JITCFlow ppc_opc_gen_cmpl(JITC &jitc)
     jitc.asmLDRw_cpu(W16, GPR_OFS(rA));
     jitc.asmLDRw_cpu(W17, GPR_OFS(rB));
     jitc.asmCMPw(W16, W17);
-    jitc.mapFlagsDirty((PPC_CRx)cr, false);
+    if (can_defer_flags(jitc, (PPC_CRx)cr)) {
+        jitc.mapFlagsDirty((PPC_CRx)cr, false);
+    } else {
+        gen_cr_insert_unsigned(jitc, (int)cr);
+    }
     return flowContinue;
 }
 
@@ -1052,7 +1104,11 @@ JITCFlow ppc_opc_gen_cmpli(JITC &jitc)
         jitc.asmMOV(W17, imm);
         jitc.asmCMPw(W16, W17);
     }
-    jitc.mapFlagsDirty((PPC_CRx)cr, false);
+    if (can_defer_flags(jitc, (PPC_CRx)cr)) {
+        jitc.mapFlagsDirty((PPC_CRx)cr, false);
+    } else {
+        gen_cr_insert_unsigned(jitc, (int)cr);
+    }
     return flowContinue;
 }
 

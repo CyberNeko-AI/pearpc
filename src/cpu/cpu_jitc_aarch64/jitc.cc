@@ -28,6 +28,7 @@
 #include "cpu/ppc_semantics_dispatch.h"
 
 byte *gTranslationCacheBase = NULL;
+extern "C" PPC_CPU_State *gCPU;
 extern void jitc_dump_and_exit(int code);
 
 static TranslationCacheFragment *jitcAllocFragment(JITC &jitc);
@@ -239,30 +240,190 @@ void JITC::asmSTR_D_cpu(int dd, uint32 offset)
     emit32(a64_STR_D(dd, X20, offset));
 }
 
-void JITC::asmFADD_D(int dd, int dn, int dm) { emit32(a64_FADD_D(dd, dn, dm)); }
-void JITC::asmFSUB_D(int dd, int dn, int dm) { emit32(a64_FSUB_D(dd, dn, dm)); }
-void JITC::asmFMUL_D(int dd, int dn, int dm) { emit32(a64_FMUL_D(dd, dn, dm)); }
-void JITC::asmFDIV_D(int dd, int dn, int dm) { emit32(a64_FDIV_D(dd, dn, dm)); }
-void JITC::asmFSQRT_D(int dd, int dn) { emit32(a64_FSQRT_D(dd, dn)); }
-void JITC::asmFABS_D(int dd, int dn) { emit32(a64_FABS_D(dd, dn)); }
-void JITC::asmFNEG_D(int dd, int dn) { emit32(a64_FNEG_D(dd, dn)); }
+void JITC::asmFADD_D(int dd, int dn, int dm)
+{
+    emit32(a64_FADD_D(dd, dn, dm));
+}
+void JITC::asmFSUB_D(int dd, int dn, int dm)
+{
+    emit32(a64_FSUB_D(dd, dn, dm));
+}
+void JITC::asmFMUL_D(int dd, int dn, int dm)
+{
+    emit32(a64_FMUL_D(dd, dn, dm));
+}
+void JITC::asmFDIV_D(int dd, int dn, int dm)
+{
+    emit32(a64_FDIV_D(dd, dn, dm));
+}
+void JITC::asmFSQRT_D(int dd, int dn)
+{
+    emit32(a64_FSQRT_D(dd, dn));
+}
+void JITC::asmFABS_D(int dd, int dn)
+{
+    emit32(a64_FABS_D(dd, dn));
+}
+void JITC::asmFNEG_D(int dd, int dn)
+{
+    emit32(a64_FNEG_D(dd, dn));
+}
 
-void JITC::asmFMADD_D(int dd, int dn, int dm, int da) { emit32(a64_FMADD_D(dd, dn, dm, da)); }
-void JITC::asmFMSUB_D(int dd, int dn, int dm, int da) { emit32(a64_FMSUB_D(dd, dn, dm, da)); }
-void JITC::asmFNMADD_D(int dd, int dn, int dm, int da) { emit32(a64_FNMADD_D(dd, dn, dm, da)); }
-void JITC::asmFNMSUB_D(int dd, int dn, int dm, int da) { emit32(a64_FNMSUB_D(dd, dn, dm, da)); }
+void JITC::asmFMADD_D(int dd, int dn, int dm, int da)
+{
+    emit32(a64_FMADD_D(dd, dn, dm, da));
+}
+void JITC::asmFMSUB_D(int dd, int dn, int dm, int da)
+{
+    emit32(a64_FMSUB_D(dd, dn, dm, da));
+}
+void JITC::asmFNMADD_D(int dd, int dn, int dm, int da)
+{
+    emit32(a64_FNMADD_D(dd, dn, dm, da));
+}
+void JITC::asmFNMSUB_D(int dd, int dn, int dm, int da)
+{
+    emit32(a64_FNMSUB_D(dd, dn, dm, da));
+}
 
-void JITC::asmFCVT_S_D(int sd, int dn) { emit32(a64_FCVT_S_D(sd, dn)); }
-void JITC::asmFCVT_D_S(int dd, int sn) { emit32(a64_FCVT_D_S(dd, sn)); }
-void JITC::asmFCVTZS_W_D(int wd, int dn) { emit32(a64_FCVTZS_W_D(wd, dn)); }
+void JITC::asmFCVT_S_D(int sd, int dn)
+{
+    emit32(a64_FCVT_S_D(sd, dn));
+}
+void JITC::asmFCVT_D_S(int dd, int sn)
+{
+    emit32(a64_FCVT_D_S(dd, sn));
+}
+void JITC::asmFCVTZS_W_D(int wd, int dn)
+{
+    emit32(a64_FCVTZS_W_D(wd, dn));
+}
 
-void JITC::asmFCMP_D(int dn, int dm) { emit32(a64_FCMP_D(dn, dm)); }
-void JITC::asmFCMP_D_zero(int dn) { emit32(a64_FCMP_D_zero(dn)); }
+void JITC::asmFCMP_D(int dn, int dm)
+{
+    emit32(a64_FCMP_D(dn, dm));
+}
+void JITC::asmFCMP_D_zero(int dn)
+{
+    emit32(a64_FCMP_D_zero(dn));
+}
 
-void JITC::asmFCSEL_D(int dd, int dn, int dm, A64Cond cond) { emit32(a64_FCSEL_D(dd, dn, dm, cond)); }
-void JITC::asmFMOV_D_X(int dd, int xn) { emit32(a64_FMOV_D_X(dd, xn)); }
-void JITC::asmFMOV_S_W(int sd, int wn) { emit32(a64_FMOV_S_W(sd, wn)); }
-void JITC::asmFMOV_W_S(int wd, int sn) { emit32(a64_FMOV_W_S(wd, sn)); }
+void JITC::asmFCSEL_D(int dd, int dn, int dm, A64Cond cond)
+{
+    emit32(a64_FCSEL_D(dd, dn, dm, cond));
+}
+void JITC::asmFMOV_D_X(int dd, int xn)
+{
+    emit32(a64_FMOV_D_X(dd, xn));
+}
+void JITC::asmFMOV_S_W(int sd, int wn)
+{
+    emit32(a64_FMOV_S_W(sd, wn));
+}
+void JITC::asmFMOV_W_S(int wd, int sn)
+{
+    emit32(a64_FMOV_W_S(wd, sn));
+}
+
+void JITC::asmLDR_Q_cpu(int vt, uint32 offset)
+{
+    emit32(a64_LDR_Q(vt, X20, offset));
+}
+
+void JITC::asmSTR_Q_cpu(int vt, uint32 offset)
+{
+    emit32(a64_STR_Q(vt, X20, offset));
+}
+
+void JITC::asmAND_V(int vd, int vn, int vm)
+{
+    emit32(a64_AND_V(vd, vn, vm));
+}
+void JITC::asmBIC_V(int vd, int vn, int vm)
+{
+    emit32(a64_BIC_V(vd, vn, vm));
+}
+void JITC::asmORR_V(int vd, int vn, int vm)
+{
+    emit32(a64_ORR_V(vd, vn, vm));
+}
+void JITC::asmORN_V(int vd, int vn, int vm)
+{
+    emit32(a64_ORN_V(vd, vn, vm));
+}
+void JITC::asmEOR_V(int vd, int vn, int vm)
+{
+    emit32(a64_EOR_V(vd, vn, vm));
+}
+void JITC::asmMVN_V(int vd, int vn)
+{
+    emit32(a64_MVN_V(vd, vn));
+}
+
+void JITC::asmADD_V_16B(int vd, int vn, int vm)
+{
+    emit32(a64_ADD_V_16B(vd, vn, vm));
+}
+void JITC::asmADD_V_8H(int vd, int vn, int vm)
+{
+    emit32(a64_ADD_V_8H(vd, vn, vm));
+}
+void JITC::asmADD_V_4S(int vd, int vn, int vm)
+{
+    emit32(a64_ADD_V_4S(vd, vn, vm));
+}
+void JITC::asmSUB_V_16B(int vd, int vn, int vm)
+{
+    emit32(a64_SUB_V_16B(vd, vn, vm));
+}
+void JITC::asmSUB_V_8H(int vd, int vn, int vm)
+{
+    emit32(a64_SUB_V_8H(vd, vn, vm));
+}
+void JITC::asmSUB_V_4S(int vd, int vn, int vm)
+{
+    emit32(a64_SUB_V_4S(vd, vn, vm));
+}
+
+void JITC::asmFADD_V_4S(int vd, int vn, int vm)
+{
+    emit32(a64_FADD_V_4S(vd, vn, vm));
+}
+void JITC::asmFSUB_V_4S(int vd, int vn, int vm)
+{
+    emit32(a64_FSUB_V_4S(vd, vn, vm));
+}
+
+void JITC::asmDUP_V_4S_reg(int vd, int wn)
+{
+    emit32(a64_DUP_V_4S_reg(vd, wn));
+}
+void JITC::asmDUP_V_8H_reg(int vd, int wn)
+{
+    emit32(a64_DUP_V_8H_reg(vd, wn));
+}
+void JITC::asmDUP_V_16B_reg(int vd, int wn)
+{
+    emit32(a64_DUP_V_16B_reg(vd, wn));
+}
+void JITC::asmDUP_V_4S_elem(int vd, int vn, int lane)
+{
+    emit32(a64_DUP_V_4S_elem(vd, vn, lane));
+}
+
+void JITC::asmCMEQ_V_4S(int vd, int vn, int vm)
+{
+    emit32(a64_CMEQ_V_4S(vd, vn, vm));
+}
+void JITC::asmCMEQ_V_8H(int vd, int vn, int vm)
+{
+    emit32(a64_CMEQ_V_8H(vd, vn, vm));
+}
+void JITC::asmCMEQ_V_16B(int vd, int vn, int vm)
+{
+    emit32(a64_CMEQ_V_16B(vd, vn, vm));
+}
+
 
 void JITC::asmBL(NativeAddress to)
 {
@@ -273,6 +434,7 @@ void JITC::asmBL(NativeAddress to)
 
 void JITC::asmB(NativeAddress to)
 {
+    emitAssure(4);
     sint64 offset = (sint64)(to - currentPage->tcp);
     sint32 imm26 = (sint32)(offset / 4);
     if (imm26 <= 0x1FFFFFF && imm26 >= -0x2000000) {
@@ -296,15 +458,32 @@ void JITC::asmCALL(NativeAddress to)
 
 void JITC::asmCALL_cpu(int stubIndex)
 {
-    uint32 offset = offsetof(PPC_CPU_State, stubs) + stubIndex * sizeof(NativeAddress);
     emitAssure(8);
-    asmLDR_cpu(X16, offset);
-    emit32(a64_BLR(X16));
+    NativeAddress target = gCPU->stubs[stubIndex];
+    sint64 offset = (sint64)(target - currentPage->tcp);
+    sint32 imm26 = (sint32)(offset / 4);
+    if (imm26 <= 0x1FFFFFF && imm26 >= -0x2000000) {
+        emit32(a64_BL((sint32)offset));
+        emit32(a64_NOP());
+    } else {
+        uint32 offset_cpu = offsetof(PPC_CPU_State, stubs) + stubIndex * sizeof(NativeAddress);
+        asmLDR_cpu(X16, offset_cpu);
+        emit32(a64_BLR(X16));
+    }
 }
 
 void JITC::asmRET()
 {
     emit32(a64_RET());
+}
+
+void JITC::addPendingFixup(NativeAddress site, uint32 targetOfs)
+{
+    if (currentPage && currentPage->numFixups < MAX_PAGE_BRANCH_FIXUPS) {
+        currentPage->fixups[currentPage->numFixups].site = site;
+        currentPage->fixups[currentPage->numFixups].targetOfs = targetOfs;
+        currentPage->numFixups++;
+    }
 }
 
 void JITC::asmADDw(NativeReg rd, NativeReg rn, NativeReg rm)
@@ -723,6 +902,7 @@ static void jitcDestroyClientPage(JITC &jitc, ClientPage *cp)
 {
     jitcDestroyFragments(jitc, cp->tcf_current);
     memset(cp->entrypoints, 0, sizeof cp->entrypoints);
+    cp->numFixups = 0;
     cp->tcf_current = NULL;
     jitcUnmapClientPage(jitc, cp);
 }
@@ -833,7 +1013,20 @@ static inline void jitcCreateEntrypoint(ClientPage *cp, uint32 ofs)
         ((byte *)cp->tcp < gTranslationCacheBase || (byte *)cp->tcp >= gTranslationCacheBase + 64 * 1024 * 1024)) {
         PPC_CPU_ERR("entrypoint tcp=%p outside cache for ofs=%x\n", cp->tcp, ofs);
     }
-    cp->entrypoints[ofs >> 2] = cp->tcp;
+    NativeAddress entry = cp->tcp;
+    cp->entrypoints[ofs >> 2] = entry;
+
+    // Resolve any pending branch fixups targeting this entrypoint
+    for (uint32 i = 0; i < cp->numFixups; i++) {
+        if (cp->fixups[i].targetOfs == ofs && cp->fixups[i].site != 0) {
+            NativeAddress site = cp->fixups[i].site;
+            sint64 diff = (sint64)(entry - site);
+            if (diff >= -128 * 1024 * 1024 && diff < 128 * 1024 * 1024) {
+                *(uint32 *)site = a64_B((sint32)diff);
+            }
+            cp->fixups[i].site = 0;
+        }
+    }
 }
 
 static inline NativeAddress jitcGetEntrypoint(ClientPage *cp, uint32 ofs)
@@ -892,6 +1085,12 @@ static NativeAddress jitcNewEntrypoint(JITC &jitc, ClientPage *cp, uint32 basead
     jitcDebugLogAdd("--- page CFG: %d blocks from %08x ---\n", cfg.numBlocks, baseaddr + ofs);
 
     while (1) {
+        if (cfg.blockAtOfs[ofs / 4] >= 0) {
+            jitc.clobberAll();
+            if (!cp->entrypoints[ofs >> 2]) {
+                jitcCreateEntrypoint(cp, ofs);
+            }
+        }
         jitc.current_opc = ppc_word_from_BE(*(uint32 *)&physpage[ofs]);
         jitcDebugLogNewInstruction(jitc);
 
@@ -1292,6 +1491,7 @@ bool JITC::init(uint maxClientPages, uint32 tcSize)
     // allocate client pages
     ClientPage *cp = ppc_malloc(sizeof(ClientPage));
     memset(cp->entrypoints, 0, sizeof cp->entrypoints);
+    cp->numFixups = 0;
     cp->tcf_current = NULL;
     cp->lessRU = NULL;
     LRUpage = NULL;
@@ -1302,6 +1502,7 @@ bool JITC::init(uint maxClientPages, uint32 tcSize)
         cp = cp->moreRU;
 
         memset(cp->entrypoints, 0, sizeof cp->entrypoints);
+        cp->numFixups = 0;
         cp->tcf_current = NULL;
     }
     cp->moreRU = NULL;

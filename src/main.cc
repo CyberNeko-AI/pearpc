@@ -221,6 +221,8 @@ static void crash_handler(int sig, siginfo_t *info, void *ctx)
     const char *signame = (sig == SIGILL)    ? "SIGILL"
                           : (sig == SIGSEGV) ? "SIGSEGV"
                           : (sig == SIGBUS)  ? "SIGBUS"
+                          : (sig == SIGTERM) ? "SIGTERM"
+                          : (sig == SIGINT)  ? "SIGINT"
                                              : "SIGNAL";
     fprintf(stderr, "\n*** %s at %p (signal %d) ***\n", signame, info->si_addr, sig);
 
@@ -244,8 +246,15 @@ static void crash_handler(int sig, siginfo_t *info, void *ctx)
     fprintf(stderr, " x24=%016llx x25=%016llx x26=%016llx x27=%016llx\n", ss->__x[24], ss->__x[25], ss->__x[26],
             ss->__x[27]);
     fprintf(stderr, " x28=%016llx\n", ss->__x[28]);
-    // Print instruction at faulting PC
+    // Print instruction and context at faulting PC
     fprintf(stderr, "  insn@pc: %08x\n", *(uint32 *)ss->__pc);
+    uint32 *code_ptr = (uint32 *)((ss->__pc - 32) & ~3);
+    fprintf(stderr, "  Host code around PC:\n");
+    for (int i = 0; i < 16; i++) {
+        fprintf(stderr, "    %p: %08x%s%s\n", &code_ptr[i], code_ptr[i],
+                &code_ptr[i] == (uint32 *)ss->__pc ? " <== PC" : "",
+                &code_ptr[i] == (uint32 *)ss->__lr ? " <== LR" : "");
+    }
 #endif
 
     // Dump CPU state, backtrace, and memory, then exit
@@ -262,6 +271,8 @@ int main(int argc, char *argv[])
     sigaction(SIGILL, &sa, NULL);
     sigaction(SIGSEGV, &sa, NULL);
     sigaction(SIGBUS, &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
+    sigaction(SIGINT, &sa, NULL);
 
     const char *configfile = NULL;
     bool showHelp = false;

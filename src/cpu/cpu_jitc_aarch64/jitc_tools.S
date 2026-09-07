@@ -102,29 +102,83 @@ do_export EXTERN(ppc_start_jitc_asm)
 //
 .p2align 4
 do_export EXTERN(ppc_new_pc_asm)
-    // Call heartbeat (checks exceptions, sets current_code_base)
-    // w0 = effective PC on entry and preserved through heartbeat
-    bl  EXTERN(ppc_heartbeat_ext_asm)
+    // Update current_code_base
+    and     w1, w0, #0xFFFFF000
+    str     w1, [x20, #current_code_base]
 
+    // Check exceptions
+    add     x1, x20, #exception_pending
+    ldar    w2, [x1]
+    cbnz    w2, .Lnewpc_exception
+
+.Lnewpc_continue:
     // Store effective PC (needed for exception handling — SRR0)
-    str w0, [x20, #pc]
-
-    // Save effective PC in w21 (callee-saved) for ISI handler
+    str     w0, [x20, #pc]
     mov     w21, w0
 
-    // Translate effective address to physical
-    // w0 = effective address, w1 = 0 (bytes to unwind, not used on aarch64)
-    mov w1, #0
-    bl  EXTERN(ppc_effective_to_physical_code)
+    // Inlined Code TLB lookup:
+    ubfx    w2, w0, #12, #TLB_BITS      // w2 = TLB index
+    and     w1, w0, #0xFFF              // w1 = page offset
+    and     w3, w0, #0xFFFFF000         // w3 = page tag
+    add     x4, x20, #tlb_code_0_eff
+    add     x5, x20, #tlb_code_0_phys
+    ldr     w16, [x4, x2, lsl #2]
+    ldr     x5, [x5, x2, lsl #3]
+    cmp     w3, w16
+    b.ne    .Lnewpc_tlb_miss
 
-    // Check for ISI exception (w0 == 0 means ISI)
+    // TLB hit: physical address = physical page base + page offset
+    add     w0, w5, w1                 // w0 = physical address
+
+    // Fast assembly lookup for already-translated entry points:
+    // X19 = JITC pointer, clientPages is at offset 0
+    ldr     x1, [x19, #clientPages]     // x1 = clientPages array
+    lsr     w2, w0, #12                 // w2 = page index
+    ldr     x3, [x1, x2, lsl #3]        // x3 = ClientPage pointer
+    cbz     x3, .Lnewpc_slow            // page not yet translated? slow path
+
+    ubfx    w4, w0, #2, #10             // w4 = instruction index (0..1023)
+    ldr     x5, [x3, x4, lsl #3]        // x5 = native entrypoint
+    cbz     x5, .Lnewpc_slow            // entrypoint not yet compiled? slow path
+
+    // Direct jump to translated native code
+    br      x5
+
+.Lnewpc_exception:
+    // Check stop_exception
+    ldrb    w2, [x20, #stop_exception]
+    tst     w2, #1
+    b.ne    ppc_stop_jitc_asm
+
+    // Check MSR_EE (bit 15 of msr => (1 << 15))
+    ldr     w3, [x20, #msr]
+    tst     w3, #(1 << 15)
+    b.eq    .Lnewpc_continue
+
+    // Interrupts enabled: check ext_exception first
+    ldrb    w2, [x20, #ext_exception]
+    tst     w2, #1
+    b.ne    EXTERN(ppc_ext_exception_asm)
+
+    // Check dec_exception
+    ldrb    w2, [x20, #dec_exception]
+    tst     w2, #1
+    b.ne    EXTERN(ppc_dec_exception_asm)
+
+    // Spurious / already cleared: continue dispatch
+    b       .Lnewpc_continue
+
+.Lnewpc_tlb_miss:
+    mov     w1, #0
+    bl      EXTERN(ppc_effective_to_physical_code)
     cbz     w0, .Lnewpc_isi
 
+.Lnewpc_slow:
     // Call jitcNewPC(jitc, physical_addr)
     // x0 = jitc, w1 = physical address from translation
-    mov w1, w0
-    mov x0, x19
-    bl  EXTERN(jitcNewPC)
+    mov     w1, w0
+    mov     x0, x19
+    bl      EXTERN(jitcNewPC)
 
     // Verify result is in translation cache (not guest memory)
     // Translation cache is at high addresses (> 0x100000000)
@@ -136,7 +190,7 @@ do_export EXTERN(ppc_new_pc_asm)
     bl      EXTERN(jitc_error_bad_native_address)
 1:
     // Jump to translated code
-    br  x0
+    br      x0
 
 .Lnewpc_isi:
     // ISI exception — ppc_exception() already set up SRR0/SRR1,
@@ -201,8 +255,7 @@ do_export EXTERN(ppc_new_pc_this_page_asm)
     cbz     x3, .Lthispage_fallback     // no ClientPage? fallback
 
     // Look up entrypoint: entrypoints[(PA & 0xFFF) >> 2]
-    and     w4, w0, #0xFFF
-    lsr     w4, w4, #2                  // w4 = instruction index (0..1023)
+    ubfx    w4, w0, #2, #10             // w4 = instruction index (0..1023)
     ldr     x5, [x3, x4, lsl #3]       // x5 = native entry point
     cbz     x5, .Lthispage_fallback     // not translated? fallback
 
@@ -721,8 +774,7 @@ do_export EXTERN(ppc_mmu_tlb_invalidate_entry_asm)
     // IN: w0 = effective address to invalidate
     //     x20 = PPC_CPU_State pointer (JIT context)
     mvn     w1, wzr                         // 0xFFFFFFFF
-    lsr     w2, w0, #12
-    and     w2, w2, #(TLB_ENTRIES - 1)      // TLB index
+    ubfx    w2, w0, #12, #TLB_BITS          // TLB index
     add     x3, x20, #tlb_code_0_eff
     str     w1, [x3, x2, lsl #2]
     add     x3, x20, #tlb_data_0_eff
