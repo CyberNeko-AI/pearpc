@@ -65,4 +65,6 @@ public:
 
 
 
+void sys_sdl_reset_mouse_accum();
+
 #endif

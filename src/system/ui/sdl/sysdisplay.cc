@@ -226,7 +226,10 @@ bool SDLSystemDisplay::changeResolutionREAL(const DisplayCharacteristics &aChara
 
 	// Create window if it doesn't exist
 	if (!gSDLWindow) {
-		SDL_WindowFlags windowFlags = 0;
+		SDL_SetHint(SDL_HINT_MOUSE_RELATIVE_MODE_CENTER, "1");
+		SDL_SetHint(SDL_HINT_MOUSE_RELATIVE_WARP_MOTION, "0");
+
+		SDL_WindowFlags windowFlags = SDL_WINDOW_HIGH_PIXEL_DENSITY;
 		if (mFullscreen) windowFlags |= SDL_WINDOW_FULLSCREEN;
 
 		if (!SDL_CreateWindowAndRenderer(mTitle,
@@ -242,6 +245,10 @@ bool SDLSystemDisplay::changeResolutionREAL(const DisplayCharacteristics &aChara
 			SDL_SetWindowFullscreen(gSDLWindow, true);
 		}
 	}
+
+	SDL_SetRenderLogicalPresentation(gSDLRenderer,
+		aCharacteristics.width, aCharacteristics.height,
+		SDL_LOGICAL_PRESENTATION_LETTERBOX);
 
 	// Determine pixel format for SDL3 texture
 	SDL_PixelFormat pixelFormat;
@@ -325,12 +332,26 @@ void SDLSystemDisplay::setMouseGrab(bool enable)
 	if (enable == isMouseGrabbed()) return;
 	SystemDisplay::setMouseGrab(enable);
 	if (gSDLWindow) {
+		int w = 0, h = 0;
+		SDL_GetWindowSize(gSDLWindow, &w, &h);
 		if (enable) {
-			SDL_SetCursor(mInvisibleCursor);
+			if (w > 0 && h > 0) {
+				SDL_WarpMouseInWindow(gSDLWindow, (float)w / 2.0f, (float)h / 2.0f);
+			}
+			SDL_SetWindowRelativeMouseMode(gSDLWindow, true);
 			SDL_SetWindowMouseGrab(gSDLWindow, true);
+			SDL_SetCursor(mInvisibleCursor);
+			SDL_HideCursor();
+			sys_sdl_reset_mouse_accum();
 		} else {
-			SDL_SetCursor(mVisibleCursor);
+			if (w > 0 && h > 0) {
+				SDL_WarpMouseInWindow(gSDLWindow, (float)w / 2.0f, (float)h / 2.0f);
+			}
+			SDL_SetWindowRelativeMouseMode(gSDLWindow, false);
 			SDL_SetWindowMouseGrab(gSDLWindow, false);
+			SDL_SetCursor(mVisibleCursor);
+			SDL_ShowCursor();
+			sys_sdl_reset_mouse_accum();
 		}
 	}
 }

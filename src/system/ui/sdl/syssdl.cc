@@ -68,6 +68,15 @@ static uint8 scancode_to_adb_key[256] = {
 	0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 };
 
+static float sMouseAccumX = 0.0f;
+static float sMouseAccumY = 0.0f;
+
+void sys_sdl_reset_mouse_accum()
+{
+	sMouseAccumX = 0.0f;
+	sMouseAccumY = 0.0f;
+}
+
 static bool handleSDLEvent(const SDL_Event &event)
 {
 	static bool mouseButton[3] = {false, false, false};
@@ -106,14 +115,22 @@ static bool handleSDLEvent(const SDL_Event &event)
 		return true;
 	}
 	case SDL_EVENT_MOUSE_BUTTON_DOWN:
+	case SDL_EVENT_MOUSE_BUTTON_UP: {
+		SDL_Event evt = event;
+		if (gSDLRenderer) {
+			SDL_ConvertEventToRenderCoordinates(gSDLRenderer, &evt);
+		}
+		gDisplay->mCurMouseX = (int)evt.button.x;
+		gDisplay->mCurMouseY = (int)evt.button.y;
+
 		ev.type = sysevMouse;
-		ev.mouse.type = sme_buttonPressed;
-		memcpy(tmpMouseButton, mouseButton, sizeof (tmpMouseButton));
+		ev.mouse.type = (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) ? sme_buttonPressed : sme_buttonReleased;
+		memcpy(tmpMouseButton, mouseButton, sizeof(tmpMouseButton));
 		{
 			SDL_MouseButtonFlags buttons = SDL_GetMouseState(NULL, NULL);
-			mouseButton[0] = buttons & SDL_BUTTON_LMASK;
-			mouseButton[1] = buttons & SDL_BUTTON_MMASK;
-			mouseButton[2] = buttons & SDL_BUTTON_RMASK;
+			mouseButton[0] = (buttons & SDL_BUTTON_LMASK) != 0;
+			mouseButton[1] = (buttons & SDL_BUTTON_MMASK) != 0;
+			mouseButton[2] = (buttons & SDL_BUTTON_RMASK) != 0;
 		}
 		ev.mouse.button1 = mouseButton[0];
 		ev.mouse.button2 = mouseButton[1];
@@ -133,47 +150,56 @@ static bool handleSDLEvent(const SDL_Event &event)
 		ev.mouse.rely = 0;
 		gMouse->handleEvent(ev);
 		return true;
-	case SDL_EVENT_MOUSE_BUTTON_UP:
-		ev.type = sysevMouse;
-		ev.mouse.type = sme_buttonReleased;
-		memcpy(tmpMouseButton, mouseButton, sizeof (tmpMouseButton));
-		{
-			SDL_MouseButtonFlags buttons = SDL_GetMouseState(NULL, NULL);
-			mouseButton[0] = buttons & SDL_BUTTON_LMASK;
-			mouseButton[1] = buttons & SDL_BUTTON_MMASK;
-			mouseButton[2] = buttons & SDL_BUTTON_RMASK;
+	}
+	case SDL_EVENT_MOUSE_MOTION: {
+		SDL_Event evt = event;
+		if (gSDLRenderer) {
+			SDL_ConvertEventToRenderCoordinates(gSDLRenderer, &evt);
 		}
-		ev.mouse.button1 = mouseButton[0];
-		ev.mouse.button2 = mouseButton[1];
-		ev.mouse.button3 = mouseButton[2];
-		if (mouseButton[0] != tmpMouseButton[0]) {
-			ev.mouse.dbutton = 1;
-		} else if (mouseButton[1] != tmpMouseButton[1]) {
-			ev.mouse.dbutton = 2;
-		} else if (mouseButton[2] != tmpMouseButton[2]) {
-			ev.mouse.dbutton = 3;
-		} else {
-			ev.mouse.dbutton = 0;
+		gDisplay->mCurMouseX = (int)evt.motion.x;
+		gDisplay->mCurMouseY = (int)evt.motion.y;
+
+		if (!gDisplay->isMouseGrabbed()) {
+			sMouseAccumX = 0.0f;
+			sMouseAccumY = 0.0f;
+			return true;
 		}
-		ev.mouse.x = gDisplay->mCurMouseX;
-		ev.mouse.y = gDisplay->mCurMouseY;
-		ev.mouse.relx = 0;
-		ev.mouse.rely = 0;
-		gMouse->handleEvent(ev);
-		return true;
-	case SDL_EVENT_MOUSE_MOTION:
+
+		sMouseAccumX += evt.motion.xrel;
+		sMouseAccumY += evt.motion.yrel;
+
 		ev.type = sysevMouse;
 		ev.mouse.type = sme_motionNotify;
 		ev.mouse.button1 = mouseButton[0];
 		ev.mouse.button2 = mouseButton[1];
 		ev.mouse.button3 = mouseButton[2];
 		ev.mouse.dbutton = 0;
-		ev.mouse.x = (int)event.motion.y;
-		ev.mouse.y = (int)event.motion.x;
-		ev.mouse.relx = (int)event.motion.xrel;
-		ev.mouse.rely = (int)event.motion.yrel;
-		gMouse->handleEvent(ev);
+		ev.mouse.x = gDisplay->mCurMouseX;
+		ev.mouse.y = gDisplay->mCurMouseY;
+
+		int chunks = 0;
+		while (((int)sMouseAccumX != 0 || (int)sMouseAccumY != 0) && chunks < 4) {
+			int dx = (int)sMouseAccumX;
+			int dy = (int)sMouseAccumY;
+			if (dx < -63) dx = -63;
+			if (dx > 63) dx = 63;
+			if (dy < -63) dy = -63;
+			if (dy > 63) dy = 63;
+
+			sMouseAccumX -= (float)dx;
+			sMouseAccumY -= (float)dy;
+
+			ev.mouse.relx = dx;
+			ev.mouse.rely = dy;
+			gMouse->handleEvent(ev);
+			chunks++;
+		}
+		if (chunks >= 4) {
+			sMouseAccumX = 0.0f;
+			sMouseAccumY = 0.0f;
+		}
 		return true;
+	}
 	case SDL_EVENT_WINDOW_SHOWN:
 	case SDL_EVENT_WINDOW_RESTORED:
 		gDisplay->setExposed(true);
@@ -226,6 +252,7 @@ void initUI(const char *title, const DisplayCharacteristics &aCharacteristics, i
 
 	sd->initCursor();
 	sd->updateTitle();
+	SDL_SetWindowRelativeMouseMode(gSDLWindow, false);
 	SDL_SetWindowMouseGrab(gSDLWindow, false);
 	sd->setExposed(true);
 }
