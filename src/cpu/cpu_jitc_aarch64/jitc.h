@@ -161,6 +161,13 @@ struct TranslationCacheFragment {
     TranslationCacheFragment *prev;
 };
 
+struct BranchFixup {
+    NativeAddress site;
+    uint32 targetOfs;
+};
+
+#define MAX_PAGE_BRANCH_FIXUPS 128
+
 /*
  *  Used to describe a (not neccessarily translated) client page
  */
@@ -172,6 +179,8 @@ struct ClientPage {
     NativeAddress tcp;
     ClientPage *moreRU;
     ClientPage *lessRU;
+    BranchFixup fixups[MAX_PAGE_BRANCH_FIXUPS];
+    uint32 numFixups;
 };
 
 struct NativeRegType {
@@ -366,6 +375,7 @@ public:
     void asmCALL_cpu(int stubIndex);            // LDR X16, [X20, #stubs[i]]; BLR X16
     static constexpr uint asmCALL_cpu_size = 8; // LDR + BLR = 2 instructions
     void asmRET();
+    void addPendingFixup(NativeAddress site, uint32 targetOfs);
 
     // ALU 32-bit register-register
     void asmADDw(NativeReg rd, NativeReg rn, NativeReg rm);

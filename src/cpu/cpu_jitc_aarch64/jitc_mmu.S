@@ -90,8 +90,7 @@
 .p2align 4
 do_export EXTERN(ppc_effective_to_physical_code)
     and     w1, w0, #0xFFF              // w1 = page offset
-    lsr     w2, w0, #12
-    and     w2, w2, #(TLB_ENTRIES - 1)  // w2 = TLB index
+    ubfx    w2, w0, #12, #TLB_BITS      // w2 = TLB index
     and     w3, w0, #0xFFFFF000         // w3 = page tag
     add     x4, x20, #tlb_code_0_eff
     ldr     w5, [x4, x2, lsl #2]
@@ -125,8 +124,7 @@ do_export EXTERN(ppc_read_effective_byte_asm)
     // Byte reads never cross a page boundary
     // TLB lookup
     and     w1, w0, #0xFFF              // page offset
-    lsr     w2, w0, #12
-    and     w2, w2, #(TLB_ENTRIES - 1)  // TLB index
+    ubfx    w2, w0, #12, #TLB_BITS      // TLB index
     and     w3, w0, #0xFFFFF000         // page tag
     add     x4, x20, #tlb_data_0_eff
     ldr     w5, [x4, x2, lsl #2]
@@ -168,8 +166,7 @@ do_export EXTERN(ppc_read_effective_half_z_asm)
     cmp     w1, #0xFFE
     b.hi    .Lread_half_z_slow
     // TLB lookup
-    lsr     w2, w0, #12
-    and     w2, w2, #(TLB_ENTRIES - 1)
+    ubfx    w2, w0, #12, #TLB_BITS
     and     w3, w0, #0xFFFFF000
     add     x4, x20, #tlb_data_0_eff
     ldr     w5, [x4, x2, lsl #2]
@@ -211,8 +208,7 @@ do_export EXTERN(ppc_read_effective_half_s_asm)
     cmp     w1, #0xFFE
     b.hi    .Lread_half_s_slow
     // TLB lookup
-    lsr     w2, w0, #12
-    and     w2, w2, #(TLB_ENTRIES - 1)
+    ubfx    w2, w0, #12, #TLB_BITS
     and     w3, w0, #0xFFFFF000
     add     x4, x20, #tlb_data_0_eff
     ldr     w5, [x4, x2, lsl #2]
@@ -256,8 +252,7 @@ do_export EXTERN(ppc_read_effective_word_asm)
     cmp     w1, #0xFFC
     b.hi    .Lread_word_slow
     // TLB lookup
-    lsr     w2, w0, #12
-    and     w2, w2, #(TLB_ENTRIES - 1)
+    ubfx    w2, w0, #12, #TLB_BITS
     and     w3, w0, #0xFFFFF000
     add     x4, x20, #tlb_data_0_eff
     ldr     w5, [x4, x2, lsl #2]
@@ -299,8 +294,7 @@ do_export EXTERN(ppc_read_effective_dword_asm)
     cmp     w1, #0xFF8
     b.hi    .Lread_dword_slow
     // TLB lookup
-    lsr     w2, w0, #12
-    and     w2, w2, #(TLB_ENTRIES - 1)
+    ubfx    w2, w0, #12, #TLB_BITS
     and     w3, w0, #0xFFFFF000
     add     x4, x20, #tlb_data_0_eff
     ldr     w5, [x4, x2, lsl #2]
@@ -342,8 +336,7 @@ do_export EXTERN(ppc_read_effective_dword_asm)
 do_export EXTERN(ppc_write_effective_byte_asm)
     and     w2, w0, #0xFFF
     // TLB lookup (write TLB)
-    lsr     w3, w0, #12
-    and     w3, w3, #(TLB_ENTRIES - 1)
+    ubfx    w3, w0, #12, #TLB_BITS
     and     w4, w0, #0xFFFFF000
     add     x5, x20, #tlb_data_8_eff
     ldr     w16, [x5, x3, lsl #2]
@@ -383,8 +376,7 @@ do_export EXTERN(ppc_write_effective_half_asm)
     cmp     w2, #0xFFE
     b.hi    .Lwrite_half_slow
     // TLB lookup (write TLB)
-    lsr     w3, w0, #12
-    and     w3, w3, #(TLB_ENTRIES - 1)
+    ubfx    w3, w0, #12, #TLB_BITS
     and     w4, w0, #0xFFFFF000
     add     x5, x20, #tlb_data_8_eff
     ldr     w16, [x5, x3, lsl #2]
@@ -425,8 +417,7 @@ do_export EXTERN(ppc_write_effective_word_asm)
     cmp     w2, #0xFFC
     b.hi    .Lwrite_word_slow
     // TLB lookup (write TLB)
-    lsr     w3, w0, #12
-    and     w3, w3, #(TLB_ENTRIES - 1)
+    ubfx    w3, w0, #12, #TLB_BITS
     and     w4, w0, #0xFFFFF000
     add     x5, x20, #tlb_data_8_eff
     ldr     w16, [x5, x3, lsl #2]
@@ -467,8 +458,7 @@ do_export EXTERN(ppc_write_effective_dword_asm)
     cmp     w2, #0xFF8
     b.hi    .Lwrite_dword_slow
     // TLB lookup (write TLB)
-    lsr     w3, w0, #12
-    and     w3, w3, #(TLB_ENTRIES - 1)
+    ubfx    w3, w0, #12, #TLB_BITS
     and     w4, w0, #0xFFFFF000
     add     x5, x20, #tlb_data_8_eff
     ldr     w16, [x5, x3, lsl #2]
@@ -501,9 +491,6 @@ do_export EXTERN(ppc_write_effective_dword_asm)
 //
 //  String load/store and cache stubs (not yet implemented)
 //
-
-//////////////////////////////////////////////////////////////////////////////////////////////
-//
 //  ppc_opc_dcbz_asm
 //
 //  IN:  w0 = EA (already cache-line aligned: EA & ~0x1F)
@@ -516,8 +503,7 @@ do_export EXTERN(ppc_write_effective_dword_asm)
 do_export EXTERN(ppc_opc_dcbz_asm)
     and     w2, w0, #0xFFF              // page offset
     // TLB lookup (write TLB)
-    lsr     w3, w0, #12
-    and     w3, w3, #(TLB_ENTRIES - 1)
+    ubfx    w3, w0, #12, #TLB_BITS
     and     w4, w0, #0xFFFFF000
     add     x5, x20, #tlb_data_8_eff
     ldr     w16, [x5, x3, lsl #2]

@@ -367,6 +367,15 @@ void JITC::asmRET()
     emit32(a64_RET());
 }
 
+void JITC::addPendingFixup(NativeAddress site, uint32 targetOfs)
+{
+    if (currentPage && currentPage->numFixups < MAX_PAGE_BRANCH_FIXUPS) {
+        currentPage->fixups[currentPage->numFixups].site = site;
+        currentPage->fixups[currentPage->numFixups].targetOfs = targetOfs;
+        currentPage->numFixups++;
+    }
+}
+
 void JITC::asmADDw(NativeReg rd, NativeReg rn, NativeReg rm)
 {
     emit32(a64_ADDw_reg(rd, rn, rm));
@@ -783,6 +792,7 @@ static void jitcDestroyClientPage(JITC &jitc, ClientPage *cp)
 {
     jitcDestroyFragments(jitc, cp->tcf_current);
     memset(cp->entrypoints, 0, sizeof cp->entrypoints);
+    cp->numFixups = 0;
     cp->tcf_current = NULL;
     jitcUnmapClientPage(jitc, cp);
 }
@@ -893,7 +903,20 @@ static inline void jitcCreateEntrypoint(ClientPage *cp, uint32 ofs)
         ((byte *)cp->tcp < gTranslationCacheBase || (byte *)cp->tcp >= gTranslationCacheBase + 64 * 1024 * 1024)) {
         PPC_CPU_ERR("entrypoint tcp=%p outside cache for ofs=%x\n", cp->tcp, ofs);
     }
-    cp->entrypoints[ofs >> 2] = cp->tcp;
+    NativeAddress entry = cp->tcp;
+    cp->entrypoints[ofs >> 2] = entry;
+
+    // Resolve any pending branch fixups targeting this entrypoint
+    for (uint32 i = 0; i < cp->numFixups; i++) {
+        if (cp->fixups[i].targetOfs == ofs && cp->fixups[i].site != 0) {
+            NativeAddress site = cp->fixups[i].site;
+            sint64 diff = (sint64)(entry - site);
+            if (diff >= -128 * 1024 * 1024 && diff < 128 * 1024 * 1024) {
+                *(uint32 *)site = a64_B((sint32)diff);
+            }
+            cp->fixups[i].site = 0;
+        }
+    }
 }
 
 static inline NativeAddress jitcGetEntrypoint(ClientPage *cp, uint32 ofs)
@@ -1355,6 +1378,7 @@ bool JITC::init(uint maxClientPages, uint32 tcSize)
     // allocate client pages
     ClientPage *cp = ppc_malloc(sizeof(ClientPage));
     memset(cp->entrypoints, 0, sizeof cp->entrypoints);
+    cp->numFixups = 0;
     cp->tcf_current = NULL;
     cp->lessRU = NULL;
     LRUpage = NULL;
@@ -1365,6 +1389,7 @@ bool JITC::init(uint maxClientPages, uint32 tcSize)
         cp = cp->moreRU;
 
         memset(cp->entrypoints, 0, sizeof cp->entrypoints);
+        cp->numFixups = 0;
         cp->tcf_current = NULL;
     }
     cp->moreRU = NULL;

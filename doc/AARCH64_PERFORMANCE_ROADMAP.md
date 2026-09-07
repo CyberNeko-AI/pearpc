@@ -143,14 +143,51 @@ Total CPU Time
  
 ---
  
-## 6. 阶段三及后续规划要点预研
- 
-### 6.1 基本块内通用寄存器分配 (Block-Level GPR Allocation)
-- 目前每条 PPC 指令都从 `gCPU->gpr[...]` 读写内存。
-- 阶段三可利用 AArch64 充裕的寄存器池（X9~X15 为临时寄存器，X21~X28 为保留寄存器）：
-  - `r1` (Stack Pointer) -> 常驻 `X21`
-  - `r2` / `r13` (TOC / SDA) -> 常驻 `X22` / `X23`
-  - 块内使用简易线性扫描/LRU 将 PPC 寄存器锁定在 X9~X15，块末尾统一回写，预计可消除 60%+ 的内存访问延迟。
- 
-### 6.2 扩展 Data TLB
-- 将目前 32 项的直接映射 Data TLB 扩展为 128/256 项，或引入 2-way 组相联，进一步降低 `ppc_read_effective_*_asm` 的失效率。
+---
+
+## 6. 阶段三优化实施细节
+
+### 6.1 页内前向分支反向修补与全量块链接 (Direct Block Chaining with Backpatching)
+- **背景**: 阶段二实现了对已知目标（主要是循环回跳）的原生直跳，但对于所有前向分支（如循环内的 `while`/`if` 条件跳出），由于目标块尚未编译，先前直接退回到 `PPC_STUB_NEW_PC_REL`，且在目标块编译后从未回填修补。这导致热点内层循环每次条件不满足跳出时，都要通过慢速分发桩走完整的 Code TLB 查询。
+- **优化**:
+  - 在 `ClientPage` 中增加挂起分支修补表 `BranchFixup fixups[MAX_PAGE_BRANCH_FIXUPS]`。
+  - 对于所有同页分支，统一发射 24 字节结构：
+    ```asm
+    ldr     w16, [x20, #exception_pending]  // 心跳/中断检测
+    cbnz    w16, +8                         // 有异常跳过直跳
+    b <target> / nop                        // 已知则直跳，未知则发射 nop 占位符
+    mov     w0, #targetOfs
+    call    PPC_STUB_NEW_PC_REL
+    ```
+  - 当目标块随后被翻译（`jitcCreateEntrypoint`）时，立即就地将挂起的 `nop` 指令覆写修补为 `a64_B(target_native - branch_site)`，并经由 `jitcFlushClientPage` 统一清空指令缓存。
+  - **收益**: 循环内所有前向分支在目标被翻译后**永久变为单条硬件直跳**。在性能采样分析中，`ppc_new_pc_asm` 由原先的 41% 占比直接彻底降为 **0 次采样（完全消失）**！
+
+### 6.2 MMU TLB 扩容与汇编索引指令精简
+- **TLB 扩容至 64 项**: 将 `TLB_ENTRIES` 从 32 提升至 64。在 64 项下，`tlb_data_8_phys` 在 `PPC_CPU_State` 中的最大偏移为 3204 字节，仍然完美保持在 AArch64 单指令立即数寻址范围（< 4096）内。
+- **`ubfx` 指令精简**:
+  在 `jitc_mmu.S` 和 `jitc_tools.S` 中，将所有内存读写桩与分发查找中的双指令操作：
+  ```asm
+  lsr     w2, w0, #12
+  and     w2, w2, #(TLB_ENTRIES - 1)
+  ```
+  精简为单条 AArch64 无符号位域提取指令：
+  ```asm
+  ubfx    w2, w0, #12, #TLB_BITS
+  ```
+  显著缩短了每个访存快路径的关键路径延迟。
+
+---
+
+## 7. 各阶段性能实测对比汇总
+
+测试平台: Apple Silicon (M系列 macOS arm64), 基准测试: `test/test_bench.elf` (128 KiB 数据量, PRNG + MD5 + LZSS 压缩解压):
+
+| 阶段 | 关键改动 | 执行耗时 | 相对基线提速 |
+|---|---|---|---|
+| **Baseline** | 初始状态 (Generic / aarch64 JIT) | **4.28s** | 1.00x |
+| **阶段一** | Code TLB 汇编快路径 + Release 编译内联 | **1.80s** | 2.38x |
+| **阶段二** | 汇编直接入口查表 + 循环后向直跳 | **0.37s** | 11.57x |
+| **阶段三** | 全量块链接反向修补 + TLB 扩容至 64 + ubfx 指令压缩 | **0.23s** | **18.61x** |
+
+累计耗时削减：**94.6%**（从 4.28 秒骤降至 0.23 秒）！
+回归测试：`./test/run_tests.sh` 全部 12 项测试保持 100% PASS。

@@ -117,8 +117,7 @@ do_export EXTERN(ppc_new_pc_asm)
 
     // Inlined Code TLB lookup:
     and     w1, w0, #0xFFF              // w1 = page offset
-    lsr     w2, w0, #12
-    and     w2, w2, #(TLB_ENTRIES - 1)  // w2 = TLB index
+    ubfx    w2, w0, #12, #TLB_BITS      // w2 = TLB index
     and     w3, w0, #0xFFFFF000         // w3 = page tag
     add     x4, x20, #tlb_code_0_eff
     ldr     w5, [x4, x2, lsl #2]
@@ -755,8 +754,7 @@ do_export EXTERN(ppc_mmu_tlb_invalidate_entry_asm)
     // IN: w0 = effective address to invalidate
     //     x20 = PPC_CPU_State pointer (JIT context)
     mvn     w1, wzr                         // 0xFFFFFFFF
-    lsr     w2, w0, #12
-    and     w2, w2, #(TLB_ENTRIES - 1)      // TLB index
+    ubfx    w2, w0, #12, #TLB_BITS          // TLB index
     add     x3, x20, #tlb_code_0_eff
     str     w1, [x3, x2, lsl #2]
     add     x3, x20, #tlb_data_0_eff

@@ -11,7 +11,8 @@
  *  published by the Free Software Foundation.
  */
 
-#define TLB_ENTRIES 32
+#define TLB_ENTRIES 64
+#define TLB_BITS 6
 
 //STRUCT(PPC_CPU_State)
 #define jitc 0

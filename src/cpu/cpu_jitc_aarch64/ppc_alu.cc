@@ -319,11 +319,10 @@ JITCFlow ppc_opc_gen_cmpi(JITC &jitc)
 }
 
 /*
- *  Helper: check if direct intra-page branch is possible.
- *  Target must be on the same page, already translated (entrypoint != 0),
- *  not an absolute/link branch, and within direct branch range (+/- 60MB).
+ *  Check whether a branch target is on the same page (same current_code_base)
+ *  and eligible for direct block chaining (forward or backward).
  */
-static inline bool can_direct_branch(JITC &jitc, bool aa, bool lk, sint32 targetOfs, NativeAddress &targetNative)
+static inline bool is_same_page_branch(JITC &jitc, bool aa, bool lk, sint32 targetOfs)
 {
     if (aa || lk) {
         return false;
@@ -331,24 +330,13 @@ static inline bool can_direct_branch(JITC &jitc, bool aa, bool lk, sint32 target
     if (targetOfs < 0 || targetOfs >= 4096) {
         return false;
     }
-    if (!jitc.currentPage) {
-        return false;
-    }
-    targetNative = jitc.currentPage->entrypoints[targetOfs >> 2];
-    if (!targetNative) {
-        return false;
-    }
-    sint64 offset = (sint64)(targetNative - jitc.currentPage->tcp);
-    if (offset < -60 * 1024 * 1024 || offset > 60 * 1024 * 1024) {
-        return false;
-    }
-    return true;
+    return jitc.currentPage != nullptr;
 }
 
 static inline uint get_branch_dispatch_size(JITC &jitc, bool aa, bool lk, sint32 targetOfs)
 {
-    NativeAddress targetNative;
-    if (can_direct_branch(jitc, aa, lk, targetOfs, targetNative)) {
+    if (is_same_page_branch(jitc, aa, lk, targetOfs)) {
+        // LDR (4) + CBNZ (4) + B/NOP (4) + MOV (4) + CALL (8) = 24 bytes
         return 4 + 4 + 4 + a64_movw_size((uint32)targetOfs) + JITC::asmCALL_cpu_size;
     }
     return a64_movw_size((uint32)targetOfs) + JITC::asmCALL_cpu_size;
@@ -356,11 +344,17 @@ static inline uint get_branch_dispatch_size(JITC &jitc, bool aa, bool lk, sint32
 
 static inline void emit_branch_dispatch(JITC &jitc, bool aa, bool lk, sint32 targetOfs)
 {
-    NativeAddress targetNative;
-    if (can_direct_branch(jitc, aa, lk, targetOfs, targetNative)) {
+    if (is_same_page_branch(jitc, aa, lk, targetOfs)) {
         jitc.asmLDRw_cpu(W16, offsetof(PPC_CPU_State, exception_pending));
         jitc.emit32(a64_CBNZw(W16, 8));
-        jitc.asmB(targetNative);
+        NativeAddress targetNative = jitc.currentPage->entrypoints[targetOfs >> 2];
+        NativeAddress branch_site = jitc.asmHERE();
+        if (targetNative) {
+            jitc.asmB(targetNative);
+        } else {
+            jitc.asmNOP();
+            jitc.addPendingFixup(branch_site, (uint32)targetOfs);
+        }
         jitc.asmMOV(W0, (uint32)targetOfs);
         jitc.asmCALL_cpu(PPC_STUB_NEW_PC_REL);
     } else if (aa) {
