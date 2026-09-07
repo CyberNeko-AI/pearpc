@@ -852,7 +852,28 @@ static Queue		gCUDAEvents(true);
 static bool cudaEventHandler(const SystemEvent &ev)
 {
 	sys_lock_semaphore(gCUDAEventSem);
-//	ht_printf("queue  %d\n", ev.key.pressed);
+	if (ev.type == sysevMouse && ev.mouse.type == sme_motionNotify && ev.mouse.dbutton == 0) {
+		ObjHandle lastHandle = gCUDAEvents.findLast();
+		if (lastHandle != InvObjHandle) {
+			SystemEventObject *lastObj = (SystemEventObject*)gCUDAEvents.get(lastHandle);
+			if (lastObj && lastObj->mEv.type == sysevMouse && lastObj->mEv.mouse.type == sme_motionNotify
+			    && lastObj->mEv.mouse.dbutton == 0
+			    && lastObj->mEv.mouse.button1 == ev.mouse.button1
+			    && lastObj->mEv.mouse.button2 == ev.mouse.button2
+			    && lastObj->mEv.mouse.button3 == ev.mouse.button3) {
+				int new_dx = lastObj->mEv.mouse.relx + ev.mouse.relx;
+				int new_dy = lastObj->mEv.mouse.rely + ev.mouse.rely;
+				if (new_dx >= -63 && new_dx <= 63 && new_dy >= -63 && new_dy <= 63) {
+					lastObj->mEv.mouse.relx = new_dx;
+					lastObj->mEv.mouse.rely = new_dy;
+					lastObj->mEv.mouse.x = ev.mouse.x;
+					lastObj->mEv.mouse.y = ev.mouse.y;
+					sys_unlock_semaphore(gCUDAEventSem);
+					return true;
+				}
+			}
+		}
+	}
 	gCUDAEvents.enQueue(new SystemEventObject(ev));
 	sys_signal_semaphore(gCUDAEventSem);
 	sys_unlock_semaphore(gCUDAEventSem);
@@ -927,6 +948,18 @@ static bool tryProcessCudaEvent(const SystemEvent &ev)
 		sys_unlock_semaphore(gCUDA.idle_sem);
 	}
 	IO_CUDA_WARN("Event processing timed out. Event dropped.\n");
+	sys_lock_mutex(gCUDAMutex);
+	if (gCUDA.left > 0 || gCUDA.state != cuda_idle) {
+		gCUDA.left = 0;
+		gCUDA.pos = 0;
+		gCUDA.state = cuda_idle;
+		gCUDA.rB |= TREQ;
+		gCUDA.rIFR &= ~SR_INT;
+	}
+	sys_unlock_mutex(gCUDAMutex);
+	sys_lock_semaphore(gCUDA.idle_sem);
+	sys_signal_semaphore(gCUDA.idle_sem);
+	sys_unlock_semaphore(gCUDA.idle_sem);
 	return false;
 }
 
@@ -934,16 +967,17 @@ static void *cudaEventLoop(void *arg)
 {
 	if (gKeyboard) gKeyboard->attachEventHandler(cudaEventHandler);
 	if (gMouse) gMouse->attachEventHandler(cudaEventHandler);
-	sys_lock_semaphore(gCUDAEventSem);
 	while (1) {
-//		IO_CUDA_WARN("waiting on semaphore\n");
-		sys_wait_semaphore(gCUDAEventSem);
-//		IO_CUDA_WARN("semaphore signalled\n");
-		SystemEventObject *seo;
-		while ((seo = (SystemEventObject*)gCUDAEvents.deQueue())) {
-			tryProcessCudaEvent(seo->mEv);
-			delete seo;
+		sys_lock_semaphore(gCUDAEventSem);
+		SystemEventObject *seo = (SystemEventObject*)gCUDAEvents.deQueue();
+		while (!seo) {
+			sys_wait_semaphore(gCUDAEventSem);
+			seo = (SystemEventObject*)gCUDAEvents.deQueue();
 		}
+		sys_unlock_semaphore(gCUDAEventSem);
+
+		tryProcessCudaEvent(seo->mEv);
+		delete seo;
 	}
 	return NULL;
 }

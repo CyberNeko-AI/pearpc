@@ -40,8 +40,8 @@ sys_mutex PIC_mutex;
 static void pic_renew_interrupts()
 {
 	if (((PIC_pending_low | PIC_pending_level) & PIC_enable_low) || (PIC_pending_high & PIC_enable_high)) {
-//	if (PIC_pending_level & PIC_enable_low) {
-		ppc_cpu_raise_ext_exception();	
+		ppc_cpu_raise_ext_exception();
+		ppc_cpu_wakeup();
 	} else {
 		ppc_cpu_cancel_ext_exception();
 	}
@@ -141,52 +141,18 @@ void pic_read(uint32 addr, uint32 &data, int size)
 
 void pic_raise_interrupt(int intr)
 {
-	if (intr == 18) {
-		static int cuda_raise_count = 0;
-		cuda_raise_count++;
-		if (cuda_raise_count <= 20 || cuda_raise_count % 1000 == 0) {
-			fprintf(stderr, "[PIC] CUDA raise #%d\n", cuda_raise_count);
-		}
-	}
 	sys_lock_mutex(PIC_mutex);
-	uint32 mask, pending;
-	int intr_;
 	if (intr > 31) {
-		mask = PIC_enable_high;
-		pending = PIC_pending_high;
-		intr_ = intr-32;
+		PIC_pending_high |= (1 << (intr - 32));
 	} else {
-		mask = PIC_enable_low;
-		pending = PIC_pending_low;
-		intr_ = intr;
-	}
-	uint32 ibit = 1 << intr_;
-	bool level = false;
-	if (intr > 31) {
-		PIC_pending_high |= ibit;
-	} else {
+		uint32 ibit = 1 << intr;
 		PIC_pending_low |= ibit;
 		if (IO_PIC_LEVEL_TYPE & ibit) {
 			PIC_pending_level |= ibit;
-			level = true;
 		}
 	}
-	/*
-	 *	edge type:
-	 *	signal int if not masked and state raises from low to high
-	 *
-	 *	level type:
-	 *	signal int if not masked and state high
-	 */
-	if ((mask & ibit) && 
-	    (level || !(pending & ibit))) {
-		IO_PIC_TRACE("*signal int: %d\n", intr);
-		ppc_cpu_raise_ext_exception();
-	} else {
-		IO_PIC_TRACE("/signal int: %d\n", intr);
-	}
+	pic_renew_interrupts();
 	sys_unlock_mutex(PIC_mutex);
-	ppc_cpu_wakeup();
 }
 
 void pic_cancel_interrupt(int intr)
