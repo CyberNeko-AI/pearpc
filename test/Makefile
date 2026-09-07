@@ -19,7 +19,7 @@ DEBUGLIB = $(SRCDIR)/debug/libdebug.a
 # We need a few stubs for symbols that the CPU lib references
 # but that aren't needed for the test harness
 
-all: jitc_test test_semantics
+all: test_semantics test_ide_io
 
 jitc_test: jitc_test.o stubs.o $(CPULIB)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(TOOLSLIB) $(DEBUGLIB) -lpthread
@@ -37,7 +37,13 @@ test_semantics: test_semantics.o
 test_semantics.o: test_semantics.cc
 	$(CXX) $(CXXFLAGS) -include ../config.h -c -o $@ $<
 
+test_ide_io: test_ide_io.o $(SRCDIR)/io/ide/ata.o $(SRCDIR)/io/ide/cd.o $(SRCDIR)/io/ide/idedevice.o $(SRCDIR)/system/osapi/posix/sysfile.o $(SRCDIR)/system/osapi/posix/systhread.o $(SRCDIR)/system/sys.o $(SRCDIR)/system/file.o $(TOOLSLIB) $(SRCDIR)/system/arch/generic/libsarch.a
+	$(CXX) $(CXXFLAGS) -o $@ $^ -lpthread
+
+test_ide_io.o: test_ide_io.cc
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
 clean:
-	rm -f jitc_test test_semantics *.o
+	rm -f jitc_test test_semantics test_ide_io *.o
 
 .PHONY: all clean

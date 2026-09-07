@@ -810,6 +810,16 @@ bool	ppc_dma_set(uint32 dest, int c, uint32 size)
 	return true;
 }
 
+byte *ppc_dma_get_ptr(uint32 addr, uint32 size)
+{
+	if (addr > gMemorySize || (addr + size) > gMemorySize) return NULL;
+	byte *ptr;
+	if (ppc_direct_physical_memory_handle(addr, ptr) == PPC_MMU_OK) {
+		return ptr;
+	}
+	return NULL;
+}
+
 
 /***************************************************************************
  *	DEPRECATED prom interface

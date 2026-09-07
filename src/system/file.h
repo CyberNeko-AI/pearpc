@@ -165,4 +165,10 @@ FileOfs		sys_ftell(SYS_FILE *file);
 void		sys_flush(SYS_FILE *file);
 //int		sys_geterror();
 
+void *		sys_mmap_file(SYS_FILE *file, FileOfs size, bool readOnly);
+void		sys_munmap_file(void *addr, FileOfs size);
+void		sys_msync_file(void *addr, FileOfs size);
+int		sys_pread(SYS_FILE *file, byte *buf, int size, FileOfs offset);
+int		sys_pwrite(SYS_FILE *file, const byte *buf, int size, FileOfs offset);
+
 #endif /* __FILE_H__ */

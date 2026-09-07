@@ -44,12 +44,17 @@ public:
 
 class ATADeviceFile: public ATADevice {
 	SYS_FILE *mFile;
+	byte *mMmapBase;
+	FileOfs mMmapSize;
+	FileOfs mCurrentOffset;
 public:
 		ATADeviceFile(const char *name, const char *filename);
 	virtual ~ATADeviceFile();
 
 	virtual bool	seek(uint64 blockno);
 	virtual void	flush();
+	virtual int	read(byte *buf, int size);
+	virtual int	write(byte *buf, int size);
 	virtual int	readBlock(byte *buf);
 	virtual int	writeBlock(byte *buf);
 

@@ -923,6 +923,18 @@ bool ppc_dma_set(uint32 dest, int c, uint32 size)
     return true;
 }
 
+byte *ppc_dma_get_ptr(uint32 addr, uint32 size)
+{
+    if (addr > gMemorySize || (addr + size) > gMemorySize) {
+        return nullptr;
+    }
+    byte *ptr;
+    if (ppc_direct_physical_memory_handle(addr, ptr) == PPC_MMU_OK) {
+        return ptr;
+    }
+    return nullptr;
+}
+
 extern PPC_CPU_State *gCPU;
 
 bool ppc_prom_set_sdr1(uint32 newval, bool quiesce)

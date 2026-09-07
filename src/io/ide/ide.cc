@@ -396,10 +396,7 @@ public:
 	void raiseInterrupt(int bus)
 	{
 		IO_IDE_TRACE("MRDMODE: %02x\n", mConfig[MRDMODE]);
-		bool blocked = (mConfig[MRDMODE] & MRDMODE_BLK_CH0) != 0;
-		bool nien = (gIDEState.state[gIDEState.drive].outreg & IDE_OUTPUT_INT) != 0;
-        PPC_DIAG_TRACE("[IDE-IRQ] raise bus=%d blk=%d nien=%d irq_line=%d\n", bus, blocked, nien, mConfig[0x3c]);
-		if (!nien && !blocked) {
+		if (!(gIDEState.state[gIDEState.drive].outreg & IDE_OUTPUT_INT) && !(mConfig[MRDMODE] & MRDMODE_BLK_CH0)) {
 			pic_raise_interrupt(mConfig[0x3c]);
 		}
 		mConfig[MRDMODE] |= MRDMODE_INTR_CH0 << bus;
@@ -407,7 +404,6 @@ public:
 	
 	void cancelInterrupt(int bus)
 	{
-        PPC_DIAG_TRACE("[IDE-IRQ] cancel bus=%d\n", bus);
 		pic_cancel_interrupt(IO_PIC_IRQ_IDE0);
 		mConfig[MRDMODE] &= ~(MRDMODE_INTR_CH0 << bus);
 	}
@@ -419,8 +415,8 @@ void drive_ident()
 	if (gIDEState.config[gIDEState.drive].installed) {
 		gIDEState.state[gIDEState.drive].status = IDE_STATUS_RDY | IDE_STATUS_DRQ | IDE_STATUS_SKC;
 	} else {
-		gIDEState.state[gIDEState.drive].status = 0;
-		gIDEState.state[gIDEState.drive].error = 0;
+		gIDEState.state[gIDEState.drive].status = IDE_STATUS_RDY | IDE_STATUS_ERR;
+		gIDEState.state[gIDEState.drive].error = 0x4; // abort command
 		return;
 	}
 	memset(&id, 0, sizeof id);
@@ -510,11 +506,7 @@ void drive_ident()
 
 // see also: static int config_drive_for_dma (ide_drive_t *drive) in ide-dma.c
 
-		// Words 54-58 (current CHS), 64-70 (EIDE timing) and 88 (UDMA)
-		// are all populated below.  Advertising only bit 2 makes ATA drivers
-		// ignore the geometry/timing fields and can prevent the block driver
-		// from completing device setup.
-		id[53] = 7; // field validity: current, EIDE and UDMA fields valid
+		id[53] = 4; // fieldValidity: Multi DMA fields valid
 
 		id[54] = gIDEState.config[gIDEState.drive].hd.cyl;
 		id[55] = gIDEState.config[gIDEState.drive].hd.heads;
@@ -1124,10 +1116,8 @@ void receive_atapi_packet()
 		int sec_size = gIDEState.state[gIDEState.drive].current_sector_size;
 		if (sec_size <= 0) sec_size = 512;
 
-		const bool use_count = (count != 0);
-
 		while (true) {
-			uint remaining_sectors = use_count ? count : (gIDEState.state[gIDEState.drive].sector_count ? gIDEState.state[gIDEState.drive].sector_count : 256);
+			uint remaining_sectors = count ? count : (gIDEState.state[gIDEState.drive].sector_count ? gIDEState.state[gIDEState.drive].sector_count : 256);
 			uint max_sectors = (uint)pr_left / sec_size;
 
 			if (max_sectors > 0) {
@@ -1185,7 +1175,7 @@ void receive_atapi_packet()
 				pr_left -= bytes_to_transfer;
 				prd.addr += bytes_to_transfer;
 
-				if (use_count) {
+				if (count) {
 					count -= sectors_to_transfer;
 				} else {
 					if (gIDEState.config[gIDEState.drive].lba) {
@@ -1212,10 +1202,9 @@ void receive_atapi_packet()
 					gIDEState.state[gIDEState.drive].sector_count -= sectors_to_transfer;
 				}
 
-				bool ready = use_count ? (count == 0) : (gIDEState.state[gIDEState.drive].sector_count == 0);
-
 				if (!pr_left) {
 					if (prd.size & 0x80000000) {
+						bool ready = count ? (count == 0) : (gIDEState.state[gIDEState.drive].sector_count == 0);
 						if (!ready) {
 							gIDEState.config[gIDEState.drive].device->release();
 							IO_IDE_WARN("no more prd's, but still something to transfer\n");
@@ -1236,7 +1225,11 @@ void receive_atapi_packet()
 					}
 				}
 
-				if (ready) break;
+				if (count) {
+					if (!count) break;
+				} else {
+					if (!gIDEState.state[gIDEState.drive].sector_count) break;
+				}
 			} else {
 				// Sub-sector fallback path (rare case where pr_left < sector size)
 				int to_transfer = sec_size;
@@ -1269,8 +1262,13 @@ void receive_atapi_packet()
 					}
 					if (!pr_left) {
 						if (prd.size & 0x80000000) {
-							bool more = (to_transfer > 0) || (use_count ? (count > 1) : (gIDEState.state[gIDEState.drive].sector_count > 1));
-							if (more) {
+							bool ready;
+							if (count) {
+								ready = false;
+							} else {
+								ready = gIDEState.state[gIDEState.drive].sector_count > 1;
+							}
+							if (to_transfer || ready) {
 								gIDEState.config[gIDEState.drive].device->release();
 								IO_IDE_WARN("no more prd's, but still something to transfer\n");
 								return false;
@@ -1291,7 +1289,7 @@ void receive_atapi_packet()
 						}
 					}
 				} while (to_transfer);
-				if (use_count) {
+				if (count) {
 					count--;
 					if (!count) break;
 				} else {
@@ -1349,12 +1347,6 @@ void receive_atapi_packet()
 	
 	bool bmide_start_dma(bool startbit)
 	{
-        PPC_DIAG_TRACE("[BMIDE-DMA] enter drive=%d start=%d mode=%d cr=0x%02x sr=0x%02x lba=%u count=%u prd=0x%08x\n",
-			gIDEState.drive, startbit, gIDEState.state[gIDEState.drive].mode,
-			mConfig[BMIDECR0], mConfig[BMIDESR0],
-			gIDEState.state[gIDEState.drive].dma_lba_start,
-			gIDEState.state[gIDEState.drive].dma_lba_count,
-			ppc_word_from_LE(*(uint32 *)&mConfig[DTPR0]));
 		IO_IDE_TRACE("start dma %d\n", gIDEState.state[gIDEState.drive].mode);
 		switch (gIDEState.state[gIDEState.drive].mode) {
 		case IDE_TRANSFER_MODE_NONE:
@@ -1387,11 +1379,9 @@ void receive_atapi_packet()
 			}
 			mConfig[BMIDESR0] &= ~BM_IDE_SR_ERROR;
 			mConfig[BMIDESR0] |= BM_IDE_SR_INTERRUPT;
-            PPC_DIAG_TRACE("[BMIDE-DMA] complete exhausted=%d sr=0x%02x\n", prd_exhausted, mConfig[BMIDESR0]);
 			raiseInterrupt(0);
 			return true;
 		}
-        IO_IDE_WARN("[BMIDE-DMA] failed sr=0x%02x\n", mConfig[BMIDESR0]);
 		return false;
 	}
 	
@@ -1401,7 +1391,6 @@ void receive_atapi_packet()
 		switch (port) {
 		case 0:
 			if (size==1) {
-                PPC_DIAG_TRACE("[BMIDE] CR0 <- 0x%02x\n", data);
 				byte prev_command = mConfig[BMIDECR0];
 				mConfig[BMIDECR0] = data & BM_IDE_CR_MASK;
 
@@ -1419,7 +1408,6 @@ void receive_atapi_packet()
 			}
 			break;
 		case 1: {
-            PPC_DIAG_TRACE("[BMIDE] MRDMODE <- 0x%02x\n", data);
 			IO_IDE_TRACE("bmide MRDMODE <- %02x\n", data);
 			mConfig[MRDMODE] &= ~(MRDMODE_BLK_CH0 | MRDMODE_BLK_CH1);
 			mConfig[MRDMODE] |= data & (MRDMODE_BLK_CH0 | MRDMODE_BLK_CH1);
@@ -1541,15 +1529,9 @@ void receive_atapi_packet()
 			return;
 		}
 		case IDE_ADDRESS_COMMAND: {
-			if (!gIDEState.config[gIDEState.drive].installed) {
-				return;
-			}
 			IO_IDE_TRACE("command register (%02x)\n", data);
 			gIDEState.state[gIDEState.drive].current_command = data;
 			gIDEState.one_time_shit = true;
-            PPC_DIAG_TRACE("[IDE-CMD] drive=%d cmd=0x%02x feat=0x%02x sec_cnt=%d\n",
-				gIDEState.drive, data, gIDEState.state[gIDEState.drive].feature,
-				gIDEState.state[gIDEState.drive].sector_count);
 			switch (data) {
 			case IDE_COMMAND_RESET_ATAPI: {
 				if (gIDEState.config[gIDEState.drive].protocol != IDE_ATAPI) {
@@ -1578,8 +1560,8 @@ void receive_atapi_packet()
 					gIDEState.state[gIDEState.drive].status = IDE_STATUS_RDY | IDE_STATUS_SKC;
 					gIDEState.state[gIDEState.drive].error = 0; 
 				} else {
-					gIDEState.state[gIDEState.drive].status = 0;
-					gIDEState.state[gIDEState.drive].error = 0;
+					gIDEState.state[gIDEState.drive].status = IDE_STATUS_RDY | IDE_STATUS_ERR;
+					gIDEState.state[gIDEState.drive].error = 0x2; // Track 0 not found
 				}
 				break;
 			}
@@ -1786,9 +1768,6 @@ void receive_atapi_packet()
 		}
 		case IDE_ADDRESS_DRV_HEAD: {
 			IO_IDE_TRACE("drive head <- %x\n", data);
-            PPC_DIAG_TRACE("[IDE-SEL] head=0x%02x drive=%d installed=%d status0=0x%02x status1=0x%02x\n",
-				data, (data & IDE_DRIVE_HEAD_SLAVE) ? 1 : 0,
-				gIDEState.config[0].installed, gIDEState.state[0].status, gIDEState.state[1].status);
 			gIDEState.drive_head = data | 0xa0;
 			if (!(gIDEState.drive_head & IDE_DRIVE_HEAD_SLAVE)) {
 				if (gIDEState.config[0].installed) {
@@ -1806,11 +1785,11 @@ void receive_atapi_packet()
 					}
 					gIDEState.state[0].error = 1;
 				} else {
-					gIDEState.state[0].status = 0;
-					gIDEState.state[0].error = 0;
-					gIDEState.state[0].cyl = 0;
-					gIDEState.state[0].sector_count = 0;
-					gIDEState.state[0].sector_no = 0;
+					gIDEState.state[0].status |= IDE_STATUS_ERR;
+					gIDEState.state[0].error = 4; // abort
+					// FIXME: is this correct?
+					// should we allow setting gIDEState.drive
+					// to drives not present or return here?
 				}
 				gIDEState.drive = 0;
 			} else {
@@ -1829,13 +1808,11 @@ void receive_atapi_packet()
 					}
 					gIDEState.state[1].error = 1;
 				} else {
-					gIDEState.state[1].status = 0;
-					gIDEState.state[1].error = 0;
-					gIDEState.state[1].cyl = 0;
-					gIDEState.state[1].sector_count = 0;
-					gIDEState.state[1].sector_no = 0;
+					gIDEState.state[1].status |= IDE_STATUS_ERR;
+					gIDEState.state[1].error = 4; // abort
 				}
 				gIDEState.drive = 1;
+				// FIXME: see above
 			}
 			gIDEState.config[gIDEState.drive].lba = gIDEState.drive_head & IDE_DRIVE_HEAD_LBA;
 			gIDEState.state[gIDEState.drive].head = gIDEState.drive_head & 0x0f;
@@ -1881,9 +1858,8 @@ void ide_read_reg(uint32 addr, uint32 &data, int size)
 		if (addr != IDE_ADDRESS_DATA) {
 			IO_IDE_ERR("ide size bla\n");
 		}
-		if (!gIDEState.config[gIDEState.drive].installed || !(gIDEState.state[gIDEState.drive].status & IDE_STATUS_DRQ)) {
+		if (!(gIDEState.state[gIDEState.drive].status & IDE_STATUS_DRQ)) {
 			IO_IDE_WARN("read data w/o DRQ, last command: 0x%08x\n", gIDEState.state[gIDEState.drive].current_command);
-			data = 0;
 			return;
 		}
 		switch (gIDEState.state[gIDEState.drive].current_command) {
@@ -2004,22 +1980,12 @@ void ide_read_reg(uint32 addr, uint32 &data, int size)
 		return ;
 	}
 	case IDE_ADDRESS_STATUS: {
-		if (!gIDEState.config[gIDEState.drive].installed) {
-			data = 0;
-            PPC_DIAG_TRACE("[IDE-STATUS] drive=%d absent\n", gIDEState.drive);
-			cancelInterrupt(0);
-			return;
-		}
 		IO_IDE_TRACE("status: %02x\n", gIDEState.state[gIDEState.drive].status);
 		data = gIDEState.state[gIDEState.drive].status;
 		cancelInterrupt(0);
 		return ;
 	}
 	case IDE_ADDRESS_STATUS2: {
-		if (!gIDEState.config[gIDEState.drive].installed) {
-			data = 0;
-			return;
-		}
 		IO_IDE_TRACE("alt-status register: %02x\n", gIDEState.state[gIDEState.drive].status);
 		data = gIDEState.state[gIDEState.drive].status;
 		return;
@@ -2221,8 +2187,8 @@ void ide_init()
 		}
 	}
 
-	gIDEState.state[0].status = gIDEState.config[0].installed ? IDE_STATUS_RDY : 0;
-	gIDEState.state[1].status = gIDEState.config[1].installed ? IDE_STATUS_RDY : 0;
+	gIDEState.state[0].status = IDE_STATUS_RDY;
+	gIDEState.state[1].status = IDE_STATUS_RDY;
 	gIDEState.one_time_shit = false;
 	if (gIDEState.config[0].installed || gIDEState.config[1].installed) {
 		gPCI_Devices->insert(new IDE_Controller());
@@ -2244,3 +2210,4 @@ void ide_init_config()
 	gConfig->acceptConfigEntryString(IDE_KEY_IDE0_SLAVE_TYPE, false);
 	gConfig->acceptConfigEntryString(IDE_KEY_IDE0_SLAVE_IMG, false);
 }
+

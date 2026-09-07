@@ -269,3 +269,46 @@ FileOfs	sys_ftell(SYS_FILE *file)
 	return ftello((FILE *)file);
 }
 
+void *sys_mmap_file(SYS_FILE *file, FileOfs size, bool readOnly)
+{
+	if (!file || size <= 0) return NULL;
+	int fd = fileno((FILE *)file);
+	if (fd < 0) return NULL;
+	int prot = readOnly ? PROT_READ : (PROT_READ | PROT_WRITE);
+	void *ptr = mmap(NULL, (size_t)size, prot, MAP_SHARED, fd, 0);
+	if (ptr == MAP_FAILED) return NULL;
+	return ptr;
+}
+
+void sys_munmap_file(void *addr, FileOfs size)
+{
+	if (addr && addr != MAP_FAILED && size > 0) {
+		munmap(addr, (size_t)size);
+	}
+}
+
+void sys_msync_file(void *addr, FileOfs size)
+{
+	if (addr && addr != MAP_FAILED && size > 0) {
+		msync(addr, (size_t)size, MS_SYNC);
+	}
+}
+
+int sys_pread(SYS_FILE *file, byte *buf, int size, FileOfs offset)
+{
+	if (!file || !buf || size <= 0) return -1;
+	int fd = fileno((FILE *)file);
+	if (fd < 0) return -1;
+	ssize_t ret = pread(fd, buf, size, (off_t)offset);
+	return (ret < 0) ? -1 : (int)ret;
+}
+
+int sys_pwrite(SYS_FILE *file, const byte *buf, int size, FileOfs offset)
+{
+	if (!file || !buf || size <= 0) return -1;
+	int fd = fileno((FILE *)file);
+	if (fd < 0) return -1;
+	ssize_t ret = pwrite(fd, buf, size, (off_t)offset);
+	return (ret < 0) ? -1 : (int)ret;
+}
+

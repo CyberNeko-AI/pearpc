@@ -426,3 +426,28 @@ void sys_free_read_write_execute(void *p)
 {
 	VirtualFree(p, 0, MEM_DECOMMIT | MEM_RELEASE);
 }
+
+void *sys_mmap_file(SYS_FILE *file, FileOfs size, bool readOnly)
+{
+	return NULL;
+}
+
+void sys_munmap_file(void *addr, FileOfs size)
+{
+}
+
+void sys_msync_file(void *addr, FileOfs size)
+{
+}
+
+int sys_pread(SYS_FILE *file, byte *buf, int size, FileOfs offset)
+{
+	if (sys_fseek(file, offset, SYS_SEEK_SET) != 0) return -1;
+	return sys_fread(file, buf, size);
+}
+
+int sys_pwrite(SYS_FILE *file, const byte *buf, int size, FileOfs offset)
+{
+	if (sys_fseek(file, offset, SYS_SEEK_SET) != 0) return -1;
+	return sys_fwrite(file, (byte *)buf, size);
+}

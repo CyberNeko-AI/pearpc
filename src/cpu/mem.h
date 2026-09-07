@@ -30,6 +30,7 @@ uint32  ppc_get_memory_size();
 bool	ppc_dma_write(uint32 dest, const void *src, uint32 size);
 bool	ppc_dma_read(void *dest, uint32 src, uint32 size);
 bool	ppc_dma_set(uint32 dest, int c, uint32 size);
+byte *	ppc_dma_get_ptr(uint32 addr, uint32 size);
 
 void	ppc_cpu_map_framebuffer(uint32 pa, uint32 ea);
 

@@ -99,6 +99,9 @@ class CDROMDeviceFile: public CDROMDevice {
 	SYS_FILE	*mFile;
 	LBA		curLBA;
 	uint32		mCapacity;
+	byte		*mMmapBase;
+	FileOfs		mMmapSize;
+	FileOfs		mCurrentOffset;
 public:
 			CDROMDeviceFile(const char *name);
 	virtual		~CDROMDeviceFile();
@@ -107,6 +110,7 @@ public:
 		bool	changeDataSource(const char *file);
 	virtual	bool	seek(uint64 blockno);
 	virtual	void	flush();
+	virtual	int	read(byte *buf, int size);
 	virtual	int	readBlock(byte *buf);
 	virtual	int	readTOC(byte *buf, bool msf, uint8 starttrack, int len,
 				int format);

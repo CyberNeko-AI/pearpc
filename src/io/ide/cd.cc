@@ -69,6 +69,7 @@ CDROMDevice::CDROMDevice(const char *name)
 	mReady = false;
 	mLocked = false;
 	is_dvd = false;
+	setMode(IDE_ATAPI_TRANSFER_DATA, 2048);
 }
 
 CDROMDevice::~CDROMDevice()
@@ -377,13 +378,16 @@ bool CDROMDevice::isDVD(void)
  *
  */
 CDROMDeviceFile::CDROMDeviceFile(const char *name)
-	: CDROMDevice(name)
+	: CDROMDevice(name), mFile(NULL), curLBA(0), mCapacity(0), mMmapBase(NULL), mMmapSize(0), mCurrentOffset(0)
 {
-	mFile = NULL;
 }
 
 CDROMDeviceFile::~CDROMDeviceFile()
 {
+	if (mMmapBase) {
+		sys_munmap_file(mMmapBase, mMmapSize);
+		mMmapBase = NULL;
+	}
 	if (mFile) sys_fclose(mFile);
 }
 
@@ -395,13 +399,40 @@ uint32 CDROMDeviceFile::getCapacity()
 bool CDROMDeviceFile::seek(uint64 blockno)
 {
 	curLBA = blockno;
-	sys_fseek(mFile, (uint64)blockno * 2048);
+	mCurrentOffset = (uint64)blockno * 2048;
+	if (!mMmapBase && mFile) {
+		sys_fseek(mFile, mCurrentOffset);
+	}
 	return true;
 }
 
 void CDROMDeviceFile::flush()
 {
-	sys_flush(mFile);
+	if (mFile) sys_flush(mFile);
+}
+
+int CDROMDeviceFile::read(byte *buf, int size)
+{
+	if (mSectorFirst && mSectorFirst < mSectorSize) {
+		return IDEDevice::read(buf, size);
+	}
+	if (mMode == IDE_ATAPI_TRANSFER_DATA) {
+		if (mMmapBase && (mCurrentOffset + size <= mMmapSize)) {
+			memcpy(buf, mMmapBase + mCurrentOffset, size);
+			mCurrentOffset += size;
+			curLBA += (size / 2048);
+			return size;
+		}
+		if (mFile) {
+			int n = sys_pread(mFile, buf, size, mCurrentOffset);
+			if (n > 0) {
+				mCurrentOffset += n;
+				curLBA += (n / 2048);
+				return n;
+			}
+		}
+	}
+	return IDEDevice::read(buf, size);
 }
 
 int CDROMDeviceFile::readBlock(byte *buf)
@@ -422,8 +453,14 @@ int CDROMDeviceFile::readBlock(byte *buf)
 		*(buf++) = 0x01; // mode 1 data
 	}
 	if (mMode & IDE_ATAPI_TRANSFER_DATA) {
-		sys_fread(mFile, buf, 2048);
+		if (mMmapBase && (mCurrentOffset + 2048 <= mMmapSize)) {
+			memcpy(buf, mMmapBase + mCurrentOffset, 2048);
+		} else {
+			if (mMmapBase && mFile) sys_fseek(mFile, mCurrentOffset);
+			sys_fread(mFile, buf, 2048);
+		}
 		buf += 2048;
+		mCurrentOffset += 2048;
 	}
 	if (mMode & IDE_ATAPI_TRANSFER_ECC) {
 		// .96
@@ -436,16 +473,34 @@ int CDROMDeviceFile::readBlock(byte *buf)
 
 bool CDROMDeviceFile::promSeek(uint64 pos)
 {
-	return sys_fseek(mFile, pos) == 0;
+	mCurrentOffset = pos;
+	if (!mMmapBase && mFile) {
+		return sys_fseek(mFile, pos) == 0;
+	}
+	return true;
 }
 
 uint CDROMDeviceFile::promRead(byte *buf, uint size)
 {
-	return sys_fread(mFile, buf, size);
+	if (mMmapBase && (mCurrentOffset + size <= mMmapSize)) {
+		memcpy(buf, mMmapBase + mCurrentOffset, size);
+		mCurrentOffset += size;
+		return size;
+	}
+	if (mFile) {
+		uint r = sys_fread(mFile, buf, size);
+		mCurrentOffset += r;
+		return r;
+	}
+	return 0;
 }
 
 bool CDROMDeviceFile::changeDataSource(const char *file)
 {
+	if (mMmapBase) {
+		sys_munmap_file(mMmapBase, mMmapSize);
+		mMmapBase = NULL;
+	}
 	if (mFile) sys_fclose(mFile);
 	mFile = sys_fopen(file, SYS_OPEN_READ);
 	if (!mFile) {
@@ -456,12 +511,17 @@ bool CDROMDeviceFile::changeDataSource(const char *file)
 	}
 	sys_fseek(mFile, 0, SYS_SEEK_END);
 	FileOfs fsize = sys_ftell(mFile);
+	mMmapSize = fsize;
+	mCurrentOffset = 0;
 	mCapacity = fsize / 2048 + !!(fsize % 2048);
 
 	if (!is_dvd && (mCapacity > 1151850)) {
 		/* In case the image just can't be a CD-ROM */
 		this->activateDVD(true);
 	}
+
+	// Read-only memory mapping for ISO/DVD image
+	mMmapBase = (byte *)sys_mmap_file(mFile, fsize, true /* readOnly */);
 
 	return true;
 }

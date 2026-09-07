@@ -30,6 +30,7 @@
 ATADevice::ATADevice(const char *name)
 	: IDEDevice(name)
 {
+	setMode(ATA_DEVICE_MODE_PLAIN, 512);
 }
 
 void ATADevice::init(int aHeads, int aCyl, int aSpt)
@@ -57,7 +58,7 @@ uint ATADevice::getBlockCount()
  *
  */
 ATADeviceFile::ATADeviceFile(const char *name, const char *filename)
-	: ATADevice(name)
+	: ATADevice(name), mMmapBase(NULL), mMmapSize(0), mCurrentOffset(0)
 {
 	mFile = sys_fopen(filename, SYS_OPEN_READ | SYS_OPEN_WRITE);
 	if (mFile) {
@@ -72,6 +73,9 @@ ATADeviceFile::ATADeviceFile(const char *name, const char *filename)
 			setError("invalid format (filesize isn't a multiple of 516096)");
 		} else {
 			init(16, cyl, 63);
+			mMmapSize = size;
+			// Attempt to memory-map the disk image for zero-copy I/O
+			mMmapBase = (byte *)sys_mmap_file(mFile, size, false /* read-write */);
 		}
 	} else {
 		char buf[256];
@@ -82,22 +86,92 @@ ATADeviceFile::ATADeviceFile(const char *name, const char *filename)
 
 ATADeviceFile::~ATADeviceFile()
 {
+	if (mMmapBase) {
+		sys_msync_file(mMmapBase, mMmapSize);
+		sys_munmap_file(mMmapBase, mMmapSize);
+		mMmapBase = NULL;
+	}
+	if (mFile) {
+		sys_fclose(mFile);
+		mFile = NULL;
+	}
 }
 
 bool ATADeviceFile::seek(uint64 blockno)
 {
-	sys_fseek(mFile, 512 * (uint64)blockno);
+	mCurrentOffset = 512 * (uint64)blockno;
+	if (!mMmapBase && mFile) {
+		sys_fseek(mFile, mCurrentOffset);
+	}
 	return true;
 }
 
 void ATADeviceFile::flush()
 {
-	sys_flush(mFile);
+	if (mMmapBase) {
+		sys_msync_file(mMmapBase, mMmapSize);
+	}
+	if (mFile) {
+		sys_flush(mFile);
+	}
+}
+
+int ATADeviceFile::read(byte *buf, int size)
+{
+	if (mSectorFirst && mSectorFirst < mSectorSize) {
+		return IDEDevice::read(buf, size);
+	}
+	if (mMode == ATA_DEVICE_MODE_PLAIN) {
+		if (mMmapBase && (mCurrentOffset + size <= mMmapSize)) {
+			memcpy(buf, mMmapBase + mCurrentOffset, size);
+			mCurrentOffset += size;
+			return size;
+		}
+		if (mFile) {
+			int n = sys_pread(mFile, buf, size, mCurrentOffset);
+			if (n > 0) {
+				mCurrentOffset += n;
+				return n;
+			}
+		}
+	}
+	return IDEDevice::read(buf, size);
+}
+
+int ATADeviceFile::write(byte *buf, int size)
+{
+	if (mSectorFirst && mSectorFirst < mSectorSize) {
+		return IDEDevice::write(buf, size);
+	}
+	if (mMode == ATA_DEVICE_MODE_PLAIN) {
+		if (mMmapBase && (mCurrentOffset + size <= mMmapSize)) {
+			memcpy(mMmapBase + mCurrentOffset, buf, size);
+			mCurrentOffset += size;
+			return size;
+		}
+		if (mFile) {
+			int n = sys_pwrite(mFile, buf, size, mCurrentOffset);
+			if (n > 0) {
+				mCurrentOffset += n;
+				return n;
+			}
+		}
+	}
+	return IDEDevice::write(buf, size);
 }
 
 int ATADeviceFile::readBlock(byte *buf)
 {
+	if (mMode == ATA_DEVICE_MODE_PLAIN && mMmapBase && (mCurrentOffset + 512 <= mMmapSize)) {
+		memcpy(buf, mMmapBase + mCurrentOffset, 512);
+		mCurrentOffset += 512;
+		return 0;
+	}
+	if (mMmapBase && mFile) {
+		sys_fseek(mFile, mCurrentOffset);
+	}
 	sys_fread(mFile, buf, 512);
+	mCurrentOffset += 512;
 	if (mMode & ATA_DEVICE_MODE_ECC) {
 		// add ECC bytes..
 		IO_IDE_ERR("ATADeviceFile: ECC not implemented\n");
@@ -107,17 +181,41 @@ int ATADeviceFile::readBlock(byte *buf)
 
 int ATADeviceFile::writeBlock(byte *buf)
 {
+	if (mMode == ATA_DEVICE_MODE_PLAIN && mMmapBase && (mCurrentOffset + 512 <= mMmapSize)) {
+		memcpy(mMmapBase + mCurrentOffset, buf, 512);
+		mCurrentOffset += 512;
+		return 0;
+	}
+	if (mMmapBase && mFile) {
+		sys_fseek(mFile, mCurrentOffset);
+	}
 	sys_fwrite(mFile, buf, 512);
+	mCurrentOffset += 512;
 	return 0;
 }
 
 bool ATADeviceFile::promSeek(FileOfs pos)
 {
-	return sys_fseek(mFile, pos) == 0;
+	mCurrentOffset = pos;
+	if (!mMmapBase && mFile) {
+		return sys_fseek(mFile, pos) == 0;
+	}
+	return true;
 }
 
 uint ATADeviceFile::promRead(byte *buf, uint size)
 {
-	return sys_fread(mFile, buf, size);
+	if (mMmapBase && (mCurrentOffset + size <= mMmapSize)) {
+		memcpy(buf, mMmapBase + mCurrentOffset, size);
+		mCurrentOffset += size;
+		return size;
+	}
+	if (mFile) {
+		uint r = sys_fread(mFile, buf, size);
+		mCurrentOffset += r;
+		return r;
+	}
+	return 0;
 }
+
 

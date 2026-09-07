@@ -76,6 +76,8 @@ virtual String &getDesc(String &result) const
  */
 IDEDevice::IDEDevice(const char *name)
 {
+	mMode = 0;
+	mSectorSize = 512;
 	mAcquired = false;
 	mSectorFirst = 0;
 	mError = NULL;
