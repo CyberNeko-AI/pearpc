@@ -27,12 +27,34 @@ TESTS=(
     test/test_crlogical.cfg
     test/test_defflags.cfg
     test/test_mid_block.cfg
+    test/test_bench.cfg
 )
 
 passed=0
 failed=0
 skipped=0
 failures=()
+
+run_with_timeout() {
+    local t="$1"
+    shift
+    if command -v timeout >/dev/null 2>&1; then
+        timeout "$t" "$@"
+    elif command -v gtimeout >/dev/null 2>&1; then
+        gtimeout "$t" "$@"
+    elif command -v python3 >/dev/null 2>&1; then
+        python3 -c '
+import subprocess, sys
+try:
+    res = subprocess.run(sys.argv[2:], timeout=float(sys.argv[1]))
+    sys.exit(res.returncode)
+except subprocess.TimeoutExpired:
+    sys.exit(124)
+' "$t" "$@"
+    else
+        "$@"
+    fi
+}
 
 for cfg in "${TESTS[@]}"; do
     name="${cfg##*/}"
@@ -45,7 +67,7 @@ for cfg in "${TESTS[@]}"; do
         continue
     fi
 
-    if output=$(timeout "$TIMEOUT" "$PPC" --headless "$cfg" 2>&1); then
+    if output=$(run_with_timeout "$TIMEOUT" "$PPC" --headless "$cfg" 2>&1); then
         printf "%-24s PASS\n" "$name"
         passed=$((passed + 1))
     else

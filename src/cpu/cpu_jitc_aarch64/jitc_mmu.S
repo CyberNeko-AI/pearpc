@@ -89,6 +89,21 @@
 //
 .p2align 4
 do_export EXTERN(ppc_effective_to_physical_code)
+    and     w1, w0, #0xFFF              // w1 = page offset
+    lsr     w2, w0, #12
+    and     w2, w2, #(TLB_ENTRIES - 1)  // w2 = TLB index
+    and     w3, w0, #0xFFFFF000         // w3 = page tag
+    add     x4, x20, #tlb_code_0_eff
+    ldr     w5, [x4, x2, lsl #2]
+    cmp     w3, w5
+    TLB_MISS_BRANCH    .Lcode_slow
+    // TLB hit: load physical page base, add page offset
+    add     x4, x20, #tlb_code_0_phys
+    ldr     x0, [x4, x2, lsl #3]        // guest physical page base (64-bit entry)
+    add     w0, w0, w1                 // w0 = physical address
+    ret
+
+.Lcode_slow:
     stp     x29, x30, [sp, #-16]!
     mov     x29, sp
     mov     w1, w0

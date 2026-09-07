@@ -59,8 +59,12 @@ dnl	profiling implies debug
 	PPC_CXXFLAGS="$PPC_CXXFLAGS -pg -g"
 else
 	if test "x$enable_debug" = "xyes"; then
-		PPC_CFLAGS="$PPC_CFLAGS -g -fno-inline"
-		PPC_CXXFLAGS="$PPC_CXXFLAGS -g -fno-inline"
+		PPC_CFLAGS="$PPC_CFLAGS -g"
+		PPC_CXXFLAGS="$PPC_CXXFLAGS -g"
+		if test "x$enable_release" != "xyes"; then
+			PPC_CFLAGS="$PPC_CFLAGS -fno-inline"
+			PPC_CXXFLAGS="$PPC_CXXFLAGS -fno-inline"
+		fi
 	fi
 fi
 

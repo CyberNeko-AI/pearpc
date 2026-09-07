@@ -112,6 +112,9 @@ extern "C" void jitc_fatal_gpr9_corrupt(PPC_CPU_State *cpu)
 }
 
 
+byte *gMemory = NULL;
+uint32 gMemorySize;
+
 /*
  *  C wrapper for ppc_effective_to_physical_code.
  *  Called from jitc_mmu.S assembly.
@@ -122,6 +125,11 @@ extern "C" uint32 ppc_effective_to_physical_code_c(PPC_CPU_State *cpu, uint32 ea
     uint32 pa;
     int r = ppc_effective_to_physical(*cpu, ea, PPC_MMU_READ | PPC_MMU_CODE, pa);
     if (r == PPC_MMU_OK) {
+        if (pa < gMemorySize) {
+            uint32 idx = (ea >> 12) & (TLB_ENTRIES - 1);
+            cpu->tlb_code_eff[idx] = ea & ~0xFFF;
+            cpu->tlb_code_phys[idx] = pa & ~0xFFF;
+        }
         return pa;
     }
     if (r == PPC_MMU_EXC) {
@@ -135,9 +143,6 @@ extern "C" uint32 ppc_effective_to_physical_code_c(PPC_CPU_State *cpu, uint32 ea
     PPC_MMU_ERR("ISI FATAL for EA %08x (r=%d)\n", ea, r);
     return 0;
 }
-
-byte *gMemory = NULL;
-uint32 gMemorySize;
 
 /*
  *  TLB slow-path helpers for JIT memory access stubs (jitc_mmu.S).
