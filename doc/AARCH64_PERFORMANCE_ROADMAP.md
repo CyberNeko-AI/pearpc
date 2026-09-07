@@ -12,15 +12,16 @@
 - **编译配置**: `./configure --enable-ui=sdl --enable-release`
 - **基准测试程序**: `test/test_bench.elf` (128 KiB 数据量，包括 xorshift32 PRNG、MD5 完整性哈希、LZSS 字典压缩与解压比对)
 
-### 1.2 性能对比
-
-| 指标 | Host 原生 C (clang -O3) | PearPC AArch64 JIT | 相对差距 |
-| :--- | :---: | :---: | :---: |
-| **执行耗时 (User Time)** | ~0.07 秒 | ~4.28 秒 | **~60x** |
-| **调度次数 (`jitcNewPC`)** | N/A | 240,000,000 次 | 5,600 万次/秒 |
-| **正确性校验** | PASS (MD5 matches) | PASS (MD5 matches) | 完全一致 |
-
-对比业界成熟的动态翻译系统（QEMU TCG 约 5~10x、Dolphin 约 2~3x），当前 AArch64 JIT 仍处于“正确性验证完备，但尚未充分榨干 Host 硬件性能”的初始阶段。
+### 1.2 性能演进与对比
+ 
+| 阶段 / 版本 | 执行耗时 (User Time) | 相对 Baseline 提速 | 调度方式 / 核心瓶颈 |
+| :--- | :---: | :---: | :--- |
+| **Host 原生 C (clang -O3)** | ~0.07 秒 | 61.1x | 本地机器码直接运行 |
+| **原始基线 (Baseline)** | 4.28 秒 | 1.0x (基准) | 无 TLB 汇编快路径、全 C++ 调度 (`jitcNewPC`) |
+| **阶段一优化后** | 1.80 秒 | **2.38x** | 汇编级 Code TLB Fast Path + Release 构建内联 |
+| **阶段二优化后** | **0.37 秒** | **11.57x** (耗时 -91.3%) | 汇编直接入口查找 + 同页分支直跳 (Block Chaining) + 内联分发快路径 |
+ 
+> 注：所有阶段均通过 `test/run_tests.sh` 包含的 12 项全套回归测试，行为与结果 MD5 完全一致。
 
 ---
 
@@ -116,17 +117,40 @@ Total CPU Time
 
 ---
 
-## 5. 阶段二及后续规划要点预研
-
-### 5.1 直接块链接 (Direct Block Chaining)
-- PPC 条件分支与无条件跳转的目标往往是确定的。当基本块 A 执行完时，若目标基本块 B 已被翻译：
-  - 在 AArch64 下，无条件分支指令 `b <offset>` 支持 ±128 MB 的跳转范围。
-  - 由于 Translation Cache 大小为 64 MB，任意两块之间均可直接用单条 `B` 指令互联。
-  - 在 macOS ARM64 上，修改已执行代码需要调用 `pthread_jit_write_protect_np(0)`，改完后切回 `(1)` 并用 `__builtin___clear_cache` 刷新。由于块链接只需一次性打补丁（Patching），后续成千万次循环都将以零开销纯硬件速度直跳。
-
-### 5.2 基本块内寄存器分配
-- 优先选择调用频率最高的 PPC 寄存器：
-  - `r1` (PPC Stack Pointer) -> 固定映射到 `X21`
-  - `r2` / `r13` (TOC / SDA) -> 固定映射到 `X22` / `X23`
-  - `r3` ~ `r10` (参数与返回值) -> 块内使用 `X9` ~ `X15` 进行 LRU 暂存
-- 块末尾或遇到函数调用时执行 Dirty Register Flush，预计可减少 60% 以上的 LDR/STR 指令发射。
+## 5. 阶段二优化实施细节
+ 
+### 5.1 汇编直接入口查找 (Assembly Entrypoint Fast Lookup)
+- **背景**: 在原实现中，每次分发都要调用 C++ 的 `jitcNewPC(jitc, pa)`，执行繁重的 LRU 链表更新与 `ClientPage` 查找。
+- **优化**: 在 `jitc_tools.S` 的 `ppc_new_pc_asm` 中，直接用汇编读取 `clientPages[PA >> 12]` 与 `entrypoints[(PA & 0xFFF) >> 2]`。命中时直接 `br x5`，将 C++ 函数调用由每秒数千万次降为几乎为零。
+ 
+### 5.2 同页直接分支与块链接 (Direct Intra-Page Branch / Block Chaining)
+- **CFG 块入口自动登记**: 在 `jitc.cc` 的 `jitcNewEntrypoint` 指令翻译循环中，利用 `PageCFG` 识别出的所有基本块入口（包括所有分支目标与循环头），在首次翻译到达时即记录其原生机器码地址至 `cp->entrypoints[ofs >> 2]`。
+- **无开销原生跳转**: 在 `ppc_alu.cc` 的 `bx` 和 `bcx` 指令生成中：
+  - 若目标在同页且原生机器码地址已生成（`entrypoints[targetOfs >> 2] != 0`，覆盖 100% 的循环回跳）：
+  - 生成原生条件跳转：
+    ```asm
+    ldr     w16, [x20, #exception_pending]  // 检测异步中断/定时器
+    cbnz    w16, .Lslow_fallback            // 有未决中断时走完整分发
+    b       <target_native_address>         // 纯硬件直跳循环头！
+    .Lslow_fallback:
+    mov     w0, #targetOfs
+    call    ppc_new_pc_rel_asm
+    ```
+  - 使计算密集型循环完全留在 CPU 硬件流水线中高速执行，彻底消除了循环体跳板开销与分支预测阻滞。
+ 
+### 5.3 分发跳板内联化 (Inlined Heartbeat & Code TLB in `ppc_new_pc_asm`)
+- 将 `ppc_heartbeat_ext_asm` 与 `ppc_effective_to_physical_code` 的快路径直接内联展开至 `ppc_new_pc_asm` 中，消除了跨函数的 `bl`/`ret` 栈帧与调用开销。
+ 
+---
+ 
+## 6. 阶段三及后续规划要点预研
+ 
+### 6.1 基本块内通用寄存器分配 (Block-Level GPR Allocation)
+- 目前每条 PPC 指令都从 `gCPU->gpr[...]` 读写内存。
+- 阶段三可利用 AArch64 充裕的寄存器池（X9~X15 为临时寄存器，X21~X28 为保留寄存器）：
+  - `r1` (Stack Pointer) -> 常驻 `X21`
+  - `r2` / `r13` (TOC / SDA) -> 常驻 `X22` / `X23`
+  - 块内使用简易线性扫描/LRU 将 PPC 寄存器锁定在 X9~X15，块末尾统一回写，预计可消除 60%+ 的内存访问延迟。
+ 
+### 6.2 扩展 Data TLB
+- 将目前 32 项的直接映射 Data TLB 扩展为 128/256 项，或引入 2-way 组相联，进一步降低 `ppc_read_effective_*_asm` 的失效率。
