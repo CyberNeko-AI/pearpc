@@ -28,6 +28,7 @@
 #include "cpu/ppc_semantics_dispatch.h"
 
 byte *gTranslationCacheBase = NULL;
+extern "C" PPC_CPU_State *gCPU;
 extern void jitc_dump_and_exit(int code);
 
 static TranslationCacheFragment *jitcAllocFragment(JITC &jitc);
@@ -356,10 +357,18 @@ void JITC::asmCALL(NativeAddress to)
 
 void JITC::asmCALL_cpu(int stubIndex)
 {
-    uint32 offset = offsetof(PPC_CPU_State, stubs) + stubIndex * sizeof(NativeAddress);
+    NativeAddress target = gCPU->stubs[stubIndex];
+    sint64 offset = (sint64)(target - currentPage->tcp);
+    sint32 imm26 = (sint32)(offset / 4);
     emitAssure(8);
-    asmLDR_cpu(X16, offset);
-    emit32(a64_BLR(X16));
+    if (imm26 <= 0x1FFFFFF && imm26 >= -0x2000000) {
+        emit32(a64_BL((sint32)offset));
+        emit32(a64_NOP());
+    } else {
+        uint32 offset_cpu = offsetof(PPC_CPU_State, stubs) + stubIndex * sizeof(NativeAddress);
+        asmLDR_cpu(X16, offset_cpu);
+        emit32(a64_BLR(X16));
+    }
 }
 
 void JITC::asmRET()

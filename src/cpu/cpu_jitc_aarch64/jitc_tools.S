@@ -116,18 +116,18 @@ do_export EXTERN(ppc_new_pc_asm)
     mov     w21, w0
 
     // Inlined Code TLB lookup:
-    and     w1, w0, #0xFFF              // w1 = page offset
     ubfx    w2, w0, #12, #TLB_BITS      // w2 = TLB index
+    and     w1, w0, #0xFFF              // w1 = page offset
     and     w3, w0, #0xFFFFF000         // w3 = page tag
     add     x4, x20, #tlb_code_0_eff
-    ldr     w5, [x4, x2, lsl #2]
-    cmp     w3, w5
+    add     x5, x20, #tlb_code_0_phys
+    ldr     w16, [x4, x2, lsl #2]
+    ldr     x5, [x5, x2, lsl #3]
+    cmp     w3, w16
     b.ne    .Lnewpc_tlb_miss
 
-    // TLB hit: load physical page base, add page offset
-    add     x4, x20, #tlb_code_0_phys
-    ldr     x0, [x4, x2, lsl #3]
-    add     w0, w0, w1                 // w0 = physical address
+    // TLB hit: physical address = physical page base + page offset
+    add     w0, w5, w1                 // w0 = physical address
 
     // Fast assembly lookup for already-translated entry points:
     // X19 = JITC pointer, clientPages is at offset 0
@@ -136,8 +136,7 @@ do_export EXTERN(ppc_new_pc_asm)
     ldr     x3, [x1, x2, lsl #3]        // x3 = ClientPage pointer
     cbz     x3, .Lnewpc_slow            // page not yet translated? slow path
 
-    and     w4, w0, #0xFFF
-    lsr     w4, w4, #2                  // w4 = instruction index (0..1023)
+    ubfx    w4, w0, #2, #10             // w4 = instruction index (0..1023)
     ldr     x5, [x3, x4, lsl #3]        // x5 = native entrypoint
     cbz     x5, .Lnewpc_slow            // entrypoint not yet compiled? slow path
 
@@ -234,8 +233,7 @@ do_export EXTERN(ppc_new_pc_this_page_asm)
     cbz     x3, .Lthispage_fallback     // no ClientPage? fallback
 
     // Look up entrypoint: entrypoints[(PA & 0xFFF) >> 2]
-    and     w4, w0, #0xFFF
-    lsr     w4, w4, #2                  // w4 = instruction index (0..1023)
+    ubfx    w4, w0, #2, #10             // w4 = instruction index (0..1023)
     ldr     x5, [x3, x4, lsl #3]       // x5 = native entry point
     cbz     x5, .Lthispage_fallback     // not translated? fallback
 

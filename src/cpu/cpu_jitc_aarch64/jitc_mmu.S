@@ -93,13 +93,12 @@ do_export EXTERN(ppc_effective_to_physical_code)
     ubfx    w2, w0, #12, #TLB_BITS      // w2 = TLB index
     and     w3, w0, #0xFFFFF000         // w3 = page tag
     add     x4, x20, #tlb_code_0_eff
-    ldr     w5, [x4, x2, lsl #2]
-    cmp     w3, w5
+    add     x5, x20, #tlb_code_0_phys
+    ldr     w16, [x4, x2, lsl #2]
+    ldr     x5, [x5, x2, lsl #3]        // guest physical page base (speculative)
+    cmp     w3, w16
     TLB_MISS_BRANCH    .Lcode_slow
-    // TLB hit: load physical page base, add page offset
-    add     x4, x20, #tlb_code_0_phys
-    ldr     x0, [x4, x2, lsl #3]        // guest physical page base (64-bit entry)
-    add     w0, w0, w1                 // w0 = physical address
+    add     w0, w5, w1                 // w0 = physical address
     ret
 
 .Lcode_slow:
@@ -122,18 +121,16 @@ do_export EXTERN(ppc_effective_to_physical_code)
 .p2align 4
 do_export EXTERN(ppc_read_effective_byte_asm)
     // Byte reads never cross a page boundary
-    // TLB lookup
-    and     w1, w0, #0xFFF              // page offset
     ubfx    w2, w0, #12, #TLB_BITS      // TLB index
+    and     w1, w0, #0xFFF              // page offset
     and     w3, w0, #0xFFFFF000         // page tag
     add     x4, x20, #tlb_data_0_eff
-    ldr     w5, [x4, x2, lsl #2]
-    cmp     w3, w5
+    add     x5, x20, #tlb_data_0_phys
+    ldr     w16, [x4, x2, lsl #2]
+    ldr     x5, [x5, x2, lsl #3]        // host page base (speculative)
+    cmp     w3, w16
     TLB_MISS_BRANCH    .Lread_byte_slow
-    // TLB hit
-    add     x4, x20, #tlb_data_0_phys
-    ldr     x4, [x4, x2, lsl #3]       // host page base
-    ldrb    w0, [x4, x1]               // load byte (no swap needed)
+    ldrb    w0, [x5, x1]               // load byte (no swap needed)
     ret
 .Lread_byte_slow:
     stp     x29, x30, [sp, #-16]!
@@ -162,20 +159,17 @@ do_export EXTERN(ppc_read_effective_byte_asm)
 //
 .p2align 4
 do_export EXTERN(ppc_read_effective_half_z_asm)
-    and     w1, w0, #0xFFF
-    cmp     w1, #0xFFE
-    b.hi    .Lread_half_z_slow
-    // TLB lookup
     ubfx    w2, w0, #12, #TLB_BITS
+    and     w1, w0, #0xFFF
     and     w3, w0, #0xFFFFF000
     add     x4, x20, #tlb_data_0_eff
-    ldr     w5, [x4, x2, lsl #2]
-    cmp     w3, w5
+    add     x5, x20, #tlb_data_0_phys
+    ldr     w16, [x4, x2, lsl #2]
+    ldr     x5, [x5, x2, lsl #3]
+    cmp     w1, #0xFFE
+    ccmp    w3, w16, #0, ls
     TLB_MISS_BRANCH    .Lread_half_z_slow
-    // TLB hit
-    add     x4, x20, #tlb_data_0_phys
-    ldr     x4, [x4, x2, lsl #3]
-    ldrh    w0, [x4, x1]               // load 16-bit LE
+    ldrh    w0, [x5, x1]               // load 16-bit LE
     rev16   w0, w0                      // byte-swap to BE
     ret
 .Lread_half_z_slow:
@@ -204,20 +198,17 @@ do_export EXTERN(ppc_read_effective_half_z_asm)
 //
 .p2align 4
 do_export EXTERN(ppc_read_effective_half_s_asm)
-    and     w1, w0, #0xFFF
-    cmp     w1, #0xFFE
-    b.hi    .Lread_half_s_slow
-    // TLB lookup
     ubfx    w2, w0, #12, #TLB_BITS
+    and     w1, w0, #0xFFF
     and     w3, w0, #0xFFFFF000
     add     x4, x20, #tlb_data_0_eff
-    ldr     w5, [x4, x2, lsl #2]
-    cmp     w3, w5
+    add     x5, x20, #tlb_data_0_phys
+    ldr     w16, [x4, x2, lsl #2]
+    ldr     x5, [x5, x2, lsl #3]
+    cmp     w1, #0xFFE
+    ccmp    w3, w16, #0, ls
     TLB_MISS_BRANCH    .Lread_half_s_slow
-    // TLB hit
-    add     x4, x20, #tlb_data_0_phys
-    ldr     x4, [x4, x2, lsl #3]
-    ldrh    w0, [x4, x1]               // load 16-bit LE
+    ldrh    w0, [x5, x1]               // load 16-bit LE
     rev16   w0, w0                      // byte-swap to BE
     sxth    w0, w0                      // sign-extend 16 -> 32
     ret
@@ -248,20 +239,17 @@ do_export EXTERN(ppc_read_effective_half_s_asm)
 //
 .p2align 4
 do_export EXTERN(ppc_read_effective_word_asm)
-    and     w1, w0, #0xFFF
-    cmp     w1, #0xFFC
-    b.hi    .Lread_word_slow
-    // TLB lookup
     ubfx    w2, w0, #12, #TLB_BITS
+    and     w1, w0, #0xFFF
     and     w3, w0, #0xFFFFF000
     add     x4, x20, #tlb_data_0_eff
-    ldr     w5, [x4, x2, lsl #2]
-    cmp     w3, w5
+    add     x5, x20, #tlb_data_0_phys
+    ldr     w16, [x4, x2, lsl #2]
+    ldr     x5, [x5, x2, lsl #3]
+    cmp     w1, #0xFFC
+    ccmp    w3, w16, #0, ls
     TLB_MISS_BRANCH    .Lread_word_slow
-    // TLB hit
-    add     x4, x20, #tlb_data_0_phys
-    ldr     x4, [x4, x2, lsl #3]
-    ldr     w0, [x4, x1]
+    ldr     w0, [x5, x1]
     rev     w0, w0                      // BE -> LE
     ret
 .Lread_word_slow:
@@ -290,20 +278,17 @@ do_export EXTERN(ppc_read_effective_word_asm)
 //
 .p2align 4
 do_export EXTERN(ppc_read_effective_dword_asm)
-    and     w1, w0, #0xFFF
-    cmp     w1, #0xFF8
-    b.hi    .Lread_dword_slow
-    // TLB lookup
     ubfx    w2, w0, #12, #TLB_BITS
+    and     w1, w0, #0xFFF
     and     w3, w0, #0xFFFFF000
     add     x4, x20, #tlb_data_0_eff
-    ldr     w5, [x4, x2, lsl #2]
-    cmp     w3, w5
+    add     x5, x20, #tlb_data_0_phys
+    ldr     w16, [x4, x2, lsl #2]
+    ldr     x5, [x5, x2, lsl #3]
+    cmp     w1, #0xFF8
+    ccmp    w3, w16, #0, ls
     TLB_MISS_BRANCH    .Lread_dword_slow
-    // TLB hit
-    add     x4, x20, #tlb_data_0_phys
-    ldr     x4, [x4, x2, lsl #3]
-    ldr     x0, [x4, x1]
+    ldr     x0, [x5, x1]
     rev     x0, x0                      // BE -> LE (64-bit)
     ret
 .Lread_dword_slow:
@@ -334,18 +319,16 @@ do_export EXTERN(ppc_read_effective_dword_asm)
 //
 .p2align 4
 do_export EXTERN(ppc_write_effective_byte_asm)
-    and     w2, w0, #0xFFF
-    // TLB lookup (write TLB)
     ubfx    w3, w0, #12, #TLB_BITS
+    and     w2, w0, #0xFFF
     and     w4, w0, #0xFFFFF000
     add     x5, x20, #tlb_data_8_eff
-    ldr     w16, [x5, x3, lsl #2]
-    cmp     w4, w16
+    add     x16, x20, #tlb_data_8_phys
+    ldr     w17, [x5, x3, lsl #2]
+    ldr     x16, [x16, x3, lsl #3]
+    cmp     w4, w17
     TLB_MISS_BRANCH    .Lwrite_byte_slow
-    // TLB hit
-    add     x5, x20, #tlb_data_8_phys
-    ldr     x5, [x5, x3, lsl #3]
-    strb    w1, [x5, x2]               // store byte (no swap needed)
+    strb    w1, [x16, x2]               // store byte (no swap needed)
     ret
 .Lwrite_byte_slow:
     stp     x29, x30, [sp, #-16]!
@@ -372,21 +355,18 @@ do_export EXTERN(ppc_write_effective_byte_asm)
 //
 .p2align 4
 do_export EXTERN(ppc_write_effective_half_asm)
-    and     w2, w0, #0xFFF
-    cmp     w2, #0xFFE
-    b.hi    .Lwrite_half_slow
-    // TLB lookup (write TLB)
     ubfx    w3, w0, #12, #TLB_BITS
+    and     w2, w0, #0xFFF
     and     w4, w0, #0xFFFFF000
     add     x5, x20, #tlb_data_8_eff
-    ldr     w16, [x5, x3, lsl #2]
-    cmp     w4, w16
+    add     x16, x20, #tlb_data_8_phys
+    ldr     w17, [x5, x3, lsl #2]
+    ldr     x16, [x16, x3, lsl #3]
+    cmp     w2, #0xFFE
+    ccmp    w4, w17, #0, ls
     TLB_MISS_BRANCH    .Lwrite_half_slow
-    // TLB hit
-    add     x5, x20, #tlb_data_8_phys
-    ldr     x5, [x5, x3, lsl #3]
-    rev16   w16, w1                     // byte-swap LE -> BE
-    strh    w16, [x5, x2]
+    rev16   w17, w1                     // byte-swap LE -> BE
+    strh    w17, [x16, x2]
     ret
 .Lwrite_half_slow:
     stp     x29, x30, [sp, #-16]!
@@ -413,21 +393,18 @@ do_export EXTERN(ppc_write_effective_half_asm)
 //
 .p2align 4
 do_export EXTERN(ppc_write_effective_word_asm)
-    and     w2, w0, #0xFFF
-    cmp     w2, #0xFFC
-    b.hi    .Lwrite_word_slow
-    // TLB lookup (write TLB)
     ubfx    w3, w0, #12, #TLB_BITS
+    and     w2, w0, #0xFFF
     and     w4, w0, #0xFFFFF000
     add     x5, x20, #tlb_data_8_eff
-    ldr     w16, [x5, x3, lsl #2]
-    cmp     w4, w16
+    add     x16, x20, #tlb_data_8_phys
+    ldr     w17, [x5, x3, lsl #2]
+    ldr     x16, [x16, x3, lsl #3]
+    cmp     w2, #0xFFC
+    ccmp    w4, w17, #0, ls
     TLB_MISS_BRANCH    .Lwrite_word_slow
-    // TLB hit
-    add     x5, x20, #tlb_data_8_phys
-    ldr     x5, [x5, x3, lsl #3]
-    rev     w16, w1                     // byte-swap LE -> BE
-    str     w16, [x5, x2]
+    rev     w17, w1                     // byte-swap LE -> BE
+    str     w17, [x16, x2]
     ret
 .Lwrite_word_slow:
     stp     x29, x30, [sp, #-16]!
@@ -454,21 +431,18 @@ do_export EXTERN(ppc_write_effective_word_asm)
 //
 .p2align 4
 do_export EXTERN(ppc_write_effective_dword_asm)
-    and     w2, w0, #0xFFF
-    cmp     w2, #0xFF8
-    b.hi    .Lwrite_dword_slow
-    // TLB lookup (write TLB)
     ubfx    w3, w0, #12, #TLB_BITS
+    and     w2, w0, #0xFFF
     and     w4, w0, #0xFFFFF000
     add     x5, x20, #tlb_data_8_eff
-    ldr     w16, [x5, x3, lsl #2]
-    cmp     w4, w16
+    add     x16, x20, #tlb_data_8_phys
+    ldr     w17, [x5, x3, lsl #2]
+    ldr     x16, [x16, x3, lsl #3]
+    cmp     w2, #0xFF8
+    ccmp    w4, w17, #0, ls
     TLB_MISS_BRANCH    .Lwrite_dword_slow
-    // TLB hit
-    add     x5, x20, #tlb_data_8_phys
-    ldr     x5, [x5, x3, lsl #3]
-    rev     x16, x1                     // byte-swap LE -> BE (64-bit)
-    str     x16, [x5, x2]
+    rev     x17, x1                     // byte-swap LE -> BE (64-bit)
+    str     x17, [x16, x2]
     ret
 .Lwrite_dword_slow:
     stp     x29, x30, [sp, #-16]!
@@ -501,20 +475,19 @@ do_export EXTERN(ppc_write_effective_dword_asm)
 //
 .p2align 4
 do_export EXTERN(ppc_opc_dcbz_asm)
-    and     w2, w0, #0xFFF              // page offset
-    // TLB lookup (write TLB)
     ubfx    w3, w0, #12, #TLB_BITS
+    and     w2, w0, #0xFFF              // page offset
     and     w4, w0, #0xFFFFF000
     add     x5, x20, #tlb_data_8_eff
-    ldr     w16, [x5, x3, lsl #2]
-    cmp     w4, w16
+    add     x16, x20, #tlb_data_8_phys
+    ldr     w17, [x5, x3, lsl #2]
+    ldr     x16, [x16, x3, lsl #3]
+    cmp     w4, w17
     TLB_MISS_BRANCH    .Ldcbz_slow
     // TLB hit — get host pointer and zero 32 bytes with two STP of XZR
-    add     x5, x20, #tlb_data_8_phys
-    ldr     x5, [x5, x3, lsl #3]
-    add     x5, x5, x2                 // host_ptr + page_offset
-    stp     xzr, xzr, [x5]
-    stp     xzr, xzr, [x5, #16]
+    add     x16, x16, x2                 // host_ptr + page_offset
+    stp     xzr, xzr, [x16]
+    stp     xzr, xzr, [x16, #16]
     ret
 .Ldcbz_slow:
     stp     x29, x30, [sp, #-16]!
