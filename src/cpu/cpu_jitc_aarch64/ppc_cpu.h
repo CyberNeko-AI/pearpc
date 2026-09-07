@@ -38,6 +38,29 @@
 
 struct JITC;
 
+enum {
+    PPC_STUB_READ_WORD = 0,
+    PPC_STUB_READ_BYTE,
+    PPC_STUB_READ_HALF_Z,
+    PPC_STUB_READ_HALF_S,
+    PPC_STUB_WRITE_WORD,
+    PPC_STUB_WRITE_BYTE,
+    PPC_STUB_WRITE_HALF,
+    PPC_STUB_NEW_PC,
+    PPC_STUB_NEW_PC_REL,
+    PPC_STUB_PROGRAM_EXC,
+    PPC_STUB_NO_FPU_EXC,
+    PPC_STUB_SC_RAISE,
+    PPC_STUB_TLB_INV_ALL,
+    PPC_STUB_TLB_INV_ENTRY,
+    PPC_STUB_GCARD_OSI,
+    PPC_STUB_READ_DWORD,
+    PPC_STUB_WRITE_DWORD,
+    PPC_STUB_DCBZ,
+    PPC_STUB_NO_VEC_EXC,
+    PPC_STUB_COUNT
+};
+
 /*
  *  This is identical to the x86_64 version.
  *  The layout must match jitc_common.h offsets exactly.
@@ -149,30 +172,8 @@ struct PPC_CPU_State {
 
     // Function pointers for asm stubs, indexed by PPC_STUB_*.
     // Stored here so JIT code can load them via [X20, #offset].
-    byte *stubs[18];
+    byte *stubs[PPC_STUB_COUNT];
 } PACKED;
-
-enum {
-    PPC_STUB_READ_WORD = 0,
-    PPC_STUB_READ_BYTE,
-    PPC_STUB_READ_HALF_Z,
-    PPC_STUB_READ_HALF_S,
-    PPC_STUB_WRITE_WORD,
-    PPC_STUB_WRITE_BYTE,
-    PPC_STUB_WRITE_HALF,
-    PPC_STUB_NEW_PC,
-    PPC_STUB_NEW_PC_REL,
-    PPC_STUB_PROGRAM_EXC,
-    PPC_STUB_NO_FPU_EXC,
-    PPC_STUB_SC_RAISE,
-    PPC_STUB_TLB_INV_ALL,
-    PPC_STUB_TLB_INV_ENTRY,
-    PPC_STUB_GCARD_OSI,
-    PPC_STUB_READ_DWORD,
-    PPC_STUB_WRITE_DWORD,
-    PPC_STUB_DCBZ,
-    PPC_STUB_COUNT
-};
 
 /*
  *  On aarch64, CPU state is accessed via a dedicated register (X20)

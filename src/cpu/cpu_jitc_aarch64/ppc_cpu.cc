@@ -324,6 +324,7 @@ bool ppc_cpu_init()
     gCPU->stubs[PPC_STUB_READ_DWORD] = (NativeAddress)ppc_read_effective_dword_asm;
     gCPU->stubs[PPC_STUB_WRITE_DWORD] = (NativeAddress)ppc_write_effective_dword_asm;
     gCPU->stubs[PPC_STUB_DCBZ] = (NativeAddress)ppc_opc_dcbz_asm;
+    gCPU->stubs[PPC_STUB_NO_VEC_EXC] = (NativeAddress)ppc_no_vec_exception_asm;
 
     ppc_dec_init();
     // initialize srs (mostly for prom)

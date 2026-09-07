@@ -325,6 +325,106 @@ void JITC::asmFMOV_W_S(int wd, int sn)
     emit32(a64_FMOV_W_S(wd, sn));
 }
 
+void JITC::asmLDR_Q_cpu(int vt, uint32 offset)
+{
+    emit32(a64_LDR_Q(vt, X20, offset));
+}
+
+void JITC::asmSTR_Q_cpu(int vt, uint32 offset)
+{
+    emit32(a64_STR_Q(vt, X20, offset));
+}
+
+void JITC::asmAND_V(int vd, int vn, int vm)
+{
+    emit32(a64_AND_V(vd, vn, vm));
+}
+void JITC::asmBIC_V(int vd, int vn, int vm)
+{
+    emit32(a64_BIC_V(vd, vn, vm));
+}
+void JITC::asmORR_V(int vd, int vn, int vm)
+{
+    emit32(a64_ORR_V(vd, vn, vm));
+}
+void JITC::asmORN_V(int vd, int vn, int vm)
+{
+    emit32(a64_ORN_V(vd, vn, vm));
+}
+void JITC::asmEOR_V(int vd, int vn, int vm)
+{
+    emit32(a64_EOR_V(vd, vn, vm));
+}
+void JITC::asmMVN_V(int vd, int vn)
+{
+    emit32(a64_MVN_V(vd, vn));
+}
+
+void JITC::asmADD_V_16B(int vd, int vn, int vm)
+{
+    emit32(a64_ADD_V_16B(vd, vn, vm));
+}
+void JITC::asmADD_V_8H(int vd, int vn, int vm)
+{
+    emit32(a64_ADD_V_8H(vd, vn, vm));
+}
+void JITC::asmADD_V_4S(int vd, int vn, int vm)
+{
+    emit32(a64_ADD_V_4S(vd, vn, vm));
+}
+void JITC::asmSUB_V_16B(int vd, int vn, int vm)
+{
+    emit32(a64_SUB_V_16B(vd, vn, vm));
+}
+void JITC::asmSUB_V_8H(int vd, int vn, int vm)
+{
+    emit32(a64_SUB_V_8H(vd, vn, vm));
+}
+void JITC::asmSUB_V_4S(int vd, int vn, int vm)
+{
+    emit32(a64_SUB_V_4S(vd, vn, vm));
+}
+
+void JITC::asmFADD_V_4S(int vd, int vn, int vm)
+{
+    emit32(a64_FADD_V_4S(vd, vn, vm));
+}
+void JITC::asmFSUB_V_4S(int vd, int vn, int vm)
+{
+    emit32(a64_FSUB_V_4S(vd, vn, vm));
+}
+
+void JITC::asmDUP_V_4S_reg(int vd, int wn)
+{
+    emit32(a64_DUP_V_4S_reg(vd, wn));
+}
+void JITC::asmDUP_V_8H_reg(int vd, int wn)
+{
+    emit32(a64_DUP_V_8H_reg(vd, wn));
+}
+void JITC::asmDUP_V_16B_reg(int vd, int wn)
+{
+    emit32(a64_DUP_V_16B_reg(vd, wn));
+}
+void JITC::asmDUP_V_4S_elem(int vd, int vn, int lane)
+{
+    emit32(a64_DUP_V_4S_elem(vd, vn, lane));
+}
+
+void JITC::asmCMEQ_V_4S(int vd, int vn, int vm)
+{
+    emit32(a64_CMEQ_V_4S(vd, vn, vm));
+}
+void JITC::asmCMEQ_V_8H(int vd, int vn, int vm)
+{
+    emit32(a64_CMEQ_V_8H(vd, vn, vm));
+}
+void JITC::asmCMEQ_V_16B(int vd, int vn, int vm)
+{
+    emit32(a64_CMEQ_V_16B(vd, vn, vm));
+}
+
+
 void JITC::asmBL(NativeAddress to)
 {
     emitAssure(a64_bl_size((uint64)to));

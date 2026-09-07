@@ -524,6 +524,41 @@ public:
     void asmFMOV_S_W(int sd, int wn); // FMOV Sd, Wn
     void asmFMOV_W_S(int wd, int sn); // FMOV Wd, Sn
 
+    // Vector load/store from CPU state (X20-relative, Q-register)
+    void asmLDR_Q_cpu(int vt, uint32 offset); // LDR Qt, [X20, #offset]
+    void asmSTR_Q_cpu(int vt, uint32 offset); // STR Qt, [X20, #offset]
+
+    // SIMD 3-register logical (16B)
+    void asmAND_V(int vd, int vn, int vm); // AND Vd.16B, Vn.16B, Vm.16B
+    void asmBIC_V(int vd, int vn, int vm); // BIC Vd.16B, Vn.16B, Vm.16B
+    void asmORR_V(int vd, int vn, int vm); // ORR Vd.16B, Vn.16B, Vm.16B
+    void asmORN_V(int vd, int vn, int vm); // ORN Vd.16B, Vn.16B, Vm.16B
+    void asmEOR_V(int vd, int vn, int vm); // EOR Vd.16B, Vn.16B, Vm.16B
+    void asmMVN_V(int vd, int vn);         // MVN Vd.16B, Vn.16B
+
+    // SIMD 3-register integer arithmetic
+    void asmADD_V_16B(int vd, int vn, int vm); // ADD Vd.16B, Vn.16B, Vm.16B
+    void asmADD_V_8H(int vd, int vn, int vm);  // ADD Vd.8H, Vn.8H, Vm.8H
+    void asmADD_V_4S(int vd, int vn, int vm);  // ADD Vd.4S, Vn.4S, Vm.4S
+    void asmSUB_V_16B(int vd, int vn, int vm); // SUB Vd.16B, Vn.16B, Vm.16B
+    void asmSUB_V_8H(int vd, int vn, int vm);  // SUB Vd.8H, Vn.8H, Vm.8H
+    void asmSUB_V_4S(int vd, int vn, int vm);  // SUB Vd.4S, Vn.4S, Vm.4S
+
+    // SIMD floating-point
+    void asmFADD_V_4S(int vd, int vn, int vm); // FADD Vd.4S, Vn.4S, Vm.4S
+    void asmFSUB_V_4S(int vd, int vn, int vm); // FSUB Vd.4S, Vn.4S, Vm.4S
+
+    // SIMD duplicate/broadcast (splat)
+    void asmDUP_V_4S_reg(int vd, int wn);            // DUP Vd.4S, Wn
+    void asmDUP_V_8H_reg(int vd, int wn);            // DUP Vd.8H, Wn
+    void asmDUP_V_16B_reg(int vd, int wn);           // DUP Vd.16B, Wn
+    void asmDUP_V_4S_elem(int vd, int vn, int lane); // DUP Vd.4S, Vn.S[lane]
+
+    // SIMD compare
+    void asmCMEQ_V_4S(int vd, int vn, int vm);  // CMEQ Vd.4S, Vn.4S, Vm.4S
+    void asmCMEQ_V_8H(int vd, int vn, int vm);  // CMEQ Vd.8H, Vn.8H, Vm.8H
+    void asmCMEQ_V_16B(int vd, int vn, int vm); // CMEQ Vd.16B, Vn.16B, Vm.16B
+
     // Forward branch helpers (precomputed offsets)
     // skip_bytes = bytes of code after this instruction to jump over
     void asmBccForward(A64Cond cond, uint skip_bytes)

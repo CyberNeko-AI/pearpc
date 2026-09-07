@@ -22,7 +22,7 @@
 #ifndef __PPC_VEC_H__
 #define __PPC_VEC_H__
 
-#define PPC_OPC_VRc	(1<<10)
+#define PPC_OPC_VRc (1 << 10)
 
 /* Rather than write each function to be endianless, we're writing these
  *   defines to do an endianless access to elements of the vector.
@@ -34,33 +34,33 @@
  */
 #if HOST_ENDIANESS == HOST_ENDIANESS_LE
 
-#define VECT_B(reg, index)	((reg).b[15 - (index)])
-#define VECT_SB(reg, index)	((reg).sb[15 - (index)])
-#define VECT_H(reg, index)	((reg).h[7 - (index)])
-#define VECT_SH(reg, index)	((reg).sh[7 - (index)])
-#define VECT_W(reg, index)	((reg).w[3 - (index)])
-#define VECT_SW(reg, index)	((reg).sw[3 - (index)])
-#define VECT_D(reg, index)	((reg).d[1 - (index)])
-#define VECT_SD(reg, index)	((reg).sd[1 - (index)])
-#define VECT_FLOAT(reg, index)	((reg).f[3 - (index)])
+#define VECT_B(reg, index) ((reg).b[15 - (index)])
+#define VECT_SB(reg, index) ((reg).sb[15 - (index)])
+#define VECT_H(reg, index) ((reg).h[7 - (index)])
+#define VECT_SH(reg, index) ((reg).sh[7 - (index)])
+#define VECT_W(reg, index) ((reg).w[3 - (index)])
+#define VECT_SW(reg, index) ((reg).sw[3 - (index)])
+#define VECT_D(reg, index) ((reg).d[1 - (index)])
+#define VECT_SD(reg, index) ((reg).sd[1 - (index)])
+#define VECT_FLOAT(reg, index) ((reg).f[3 - (index)])
 
-#define VECT_EVEN(index)	(((index) << 1) + 1)
-#define VECT_ODD(index)		(((index) << 1) + 0)
+#define VECT_EVEN(index) (((index) << 1) + 1)
+#define VECT_ODD(index) (((index) << 1) + 0)
 
 #elif HOST_ENDIANESS == HOST_ENDIANESS_BE
 
-#define VECT_B(reg, index)	((reg).b[(index)])
-#define VECT_SB(reg, index)	((reg).sb[(index)])
-#define VECT_H(reg, index)	((reg).h[(index)])
-#define VECT_SH(reg, index)	((reg).sh[(index)])
-#define VECT_W(reg, index)	((reg).w[(index)])
-#define VECT_SW(reg, index)	((reg).sw[(index)])
-#define VECT_D(reg, index)	((reg).d[(index)])
-#define VECT_SD(reg, index)	((reg).sd[(index)])
-#define VECT_FLOAT(reg, index)	((reg).f[(index)])
+#define VECT_B(reg, index) ((reg).b[(index)])
+#define VECT_SB(reg, index) ((reg).sb[(index)])
+#define VECT_H(reg, index) ((reg).h[(index)])
+#define VECT_SH(reg, index) ((reg).sh[(index)])
+#define VECT_W(reg, index) ((reg).w[(index)])
+#define VECT_SW(reg, index) ((reg).sw[(index)])
+#define VECT_D(reg, index) ((reg).d[(index)])
+#define VECT_SD(reg, index) ((reg).sd[(index)])
+#define VECT_FLOAT(reg, index) ((reg).f[(index)])
 
-#define VECT_EVEN(index)	(((index) << 1) + 0)
-#define VECT_ODD(index)		(((index) << 1) + 1)
+#define VECT_EVEN(index) (((index) << 1) + 0)
+#define VECT_ODD(index) (((index) << 1) + 1)
 
 #else
 #error Endianess not supported!
@@ -227,5 +227,35 @@ int ppc_opc_vcmpgtswx(PPC_CPU_State &aCPU);
 int ppc_opc_vcmpgtfpx(PPC_CPU_State &aCPU);
 int ppc_opc_vcmpgefpx(PPC_CPU_State &aCPU);
 int ppc_opc_vcmpbfpx(PPC_CPU_State &aCPU);
+
+struct JITC;
+
+#define VR_OFS(n) (offsetof(PPC_CPU_State, vr) + (n) * sizeof(Vector_t))
+
+void gen_check_vec(JITC &jitc);
+
+JITCFlow ppc_opc_gen_vaddubm(JITC &jitc);
+JITCFlow ppc_opc_gen_vadduhm(JITC &jitc);
+JITCFlow ppc_opc_gen_vadduwm(JITC &jitc);
+JITCFlow ppc_opc_gen_vsububm(JITC &jitc);
+JITCFlow ppc_opc_gen_vsubuhm(JITC &jitc);
+JITCFlow ppc_opc_gen_vsubuwm(JITC &jitc);
+JITCFlow ppc_opc_gen_vaddfp(JITC &jitc);
+JITCFlow ppc_opc_gen_vsubfp(JITC &jitc);
+
+JITCFlow ppc_opc_gen_vand(JITC &jitc);
+JITCFlow ppc_opc_gen_vandc(JITC &jitc);
+JITCFlow ppc_opc_gen_vor(JITC &jitc);
+JITCFlow ppc_opc_gen_vnor(JITC &jitc);
+JITCFlow ppc_opc_gen_vxor(JITC &jitc);
+
+JITCFlow ppc_opc_gen_vspltisb(JITC &jitc);
+JITCFlow ppc_opc_gen_vspltish(JITC &jitc);
+JITCFlow ppc_opc_gen_vspltisw(JITC &jitc);
+JITCFlow ppc_opc_gen_vspltw(JITC &jitc);
+
+JITCFlow ppc_opc_gen_vcmpequwx(JITC &jitc);
+JITCFlow ppc_opc_gen_vcmpequbx(JITC &jitc);
+JITCFlow ppc_opc_gen_vcmpequhx(JITC &jitc);
 
 #endif

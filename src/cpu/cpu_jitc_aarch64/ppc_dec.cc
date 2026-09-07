@@ -39,16 +39,15 @@
 
 static int ppc_opc_invalid(PPC_CPU_State &aCPU)
 {
-    fprintf(stderr, "[INVALID] opc=%08x pc=%08x\n", aCPU.current_opc,
-        aCPU.current_code_base + aCPU.pc_ofs);
+    fprintf(stderr, "[INVALID] opc=%08x pc=%08x\n", aCPU.current_opc, aCPU.current_code_base + aCPU.pc_ofs);
     SINGLESTEP("unknown instruction\n");
-	return 0;
+    return 0;
 }
 
 static JITCFlow ppc_opc_gen_invalid(JITC &jitc)
 {
-    fprintf(stderr, "[JITC] WARNING: unknown opcode %08x at pa=%08x+%04x\n",
-        jitc.current_opc, jitc.currentPage->baseaddress, jitc.pc);
+    fprintf(stderr, "[JITC] WARNING: unknown opcode %08x at pa=%08x+%04x\n", jitc.current_opc,
+            jitc.currentPage->baseaddress, jitc.pc);
     jitc.clobberAll();
     // Store pc_ofs for exception handler
     jitc.asmMOV(W0, jitc.pc);
@@ -80,9 +79,9 @@ static JITCFlow ppc_opc_gen_invalid(JITC &jitc)
     {                                                                                                                  \
         ppc_opc_gen_interpret(jitc, ppc_opc_##name);                                                                   \
         /* Load npc from CPU state into W0 */                                                                          \
-        jitc.asmLDRw_cpu(W0, offsetof(PPC_CPU_State, npc));                                                             \
+        jitc.asmLDRw_cpu(W0, offsetof(PPC_CPU_State, npc));                                                            \
         /* Jump to ppc_new_pc_asm */                                                                                   \
-        jitc.asmCALL_cpu(PPC_STUB_NEW_PC);                                                                   \
+        jitc.asmCALL_cpu(PPC_STUB_NEW_PC);                                                                             \
         return flowEndBlockUnreachable;                                                                                \
     }
 
@@ -185,33 +184,33 @@ GEN_INTERPRET(fctiwx)
 // FPSCR-modifying opcodes must reset checkedRounding
 JITCFlow ppc_opc_gen_mcrfs(JITC &jitc)
 {
-	jitc.checkedRounding = false;
-	ppc_opc_gen_interpret(jitc, ppc_opc_mcrfs);
-	return flowContinue;
+    jitc.checkedRounding = false;
+    ppc_opc_gen_interpret(jitc, ppc_opc_mcrfs);
+    return flowContinue;
 }
 JITCFlow ppc_opc_gen_mtfsb0x(JITC &jitc)
 {
-	jitc.checkedRounding = false;
-	ppc_opc_gen_interpret(jitc, ppc_opc_mtfsb0x);
-	return flowContinue;
+    jitc.checkedRounding = false;
+    ppc_opc_gen_interpret(jitc, ppc_opc_mtfsb0x);
+    return flowContinue;
 }
 JITCFlow ppc_opc_gen_mtfsb1x(JITC &jitc)
 {
-	jitc.checkedRounding = false;
-	ppc_opc_gen_interpret(jitc, ppc_opc_mtfsb1x);
-	return flowContinue;
+    jitc.checkedRounding = false;
+    ppc_opc_gen_interpret(jitc, ppc_opc_mtfsb1x);
+    return flowContinue;
 }
 JITCFlow ppc_opc_gen_mtfsfx(JITC &jitc)
 {
-	jitc.checkedRounding = false;
-	ppc_opc_gen_interpret(jitc, ppc_opc_mtfsfx);
-	return flowContinue;
+    jitc.checkedRounding = false;
+    ppc_opc_gen_interpret(jitc, ppc_opc_mtfsfx);
+    return flowContinue;
 }
 JITCFlow ppc_opc_gen_mtfsfix(JITC &jitc)
 {
-	jitc.checkedRounding = false;
-	ppc_opc_gen_interpret(jitc, ppc_opc_mtfsfix);
-	return flowContinue;
+    jitc.checkedRounding = false;
+    ppc_opc_gen_interpret(jitc, ppc_opc_mtfsfix);
+    return flowContinue;
 }
 
 /* Misc */
@@ -317,7 +316,7 @@ static int ppc_opc_special(PPC_CPU_State &aCPU)
         exit(aCPU.gpr[3]);
     }
     ppc_opc_invalid(aCPU);
-	return 0;
+    return 0;
 }
 
 static JITCFlow ppc_opc_gen_special(JITC &jitc)
@@ -650,7 +649,7 @@ static int ppc_opc_group_2(PPC_CPU_State &aCPU)
         ppc_opc_invalid(aCPU);
     }
     ppc_opc_table_group2[ext](aCPU);
-	return 0;
+    return 0;
 }
 static JITCFlow ppc_opc_gen_group_2(JITC &aJITC)
 {
@@ -678,8 +677,7 @@ static void ppc_opc_gen_check_fpu(JITC &jitc)
         jitc.asmTSTw_val(W0, MSR_FP);
 
         // Precompute body size: MOV(pc) + BL(exception)
-        uint body = a64_movw_size(jitc.pc)
-                  + JITC::asmCALL_cpu_size;
+        uint body = a64_movw_size(jitc.pc) + JITC::asmCALL_cpu_size;
         jitc.emitAssure(4 + body);
         NativeAddress target = jitc.asmHERE() + 4 + body;
         jitc.asmBccForward(A64_NE, body); // B.NE skip (FP enabled)
@@ -715,7 +713,7 @@ static int ppc_opc_group_f1(PPC_CPU_State &aCPU)
     case 31: ppc_opc_fnmaddsx(aCPU); return 0;
     }
     ppc_opc_invalid(aCPU);
-	return 0;
+    return 0;
 }
 static JITCFlow ppc_opc_gen_group_f1(JITC &aJITC)
 {
@@ -791,7 +789,7 @@ static int ppc_opc_group_f2(PPC_CPU_State &aCPU)
         }
     }
     ppc_opc_invalid(aCPU);
-	return 0;
+    return 0;
 }
 static JITCFlow ppc_opc_gen_group_f2(JITC &aJITC)
 {
@@ -846,48 +844,53 @@ ppc_opc_gen_function ppc_opc_table_gen_groupv[965];
 static int ppc_opc_group_v(PPC_CPU_State &aCPU)
 {
     uint32 ext = PPC_OPC_EXT(aCPU.current_opc);
-#ifndef  __VEC_EXC_OFF__
+#ifndef __VEC_EXC_OFF__
     if ((aCPU.msr & MSR_VEC) == 0) {
         ppc_exception(aCPU, PPC_EXC_NO_VEC);
         return 1;
     }
 #endif
-    switch(ext & 0x1f) {
+    switch (ext & 0x1f) {
     case 16:
-        if (aCPU.current_opc & PPC_OPC_Rc)
+        if (aCPU.current_opc & PPC_OPC_Rc) {
             return ppc_opc_vmhraddshs(aCPU);
-        else
+        } else {
             return ppc_opc_vmhaddshs(aCPU);
+        }
     case 17: return ppc_opc_vmladduhm(aCPU);
     case 18:
-        if (aCPU.current_opc & PPC_OPC_Rc)
+        if (aCPU.current_opc & PPC_OPC_Rc) {
             return ppc_opc_vmsummbm(aCPU);
-        else
+        } else {
             return ppc_opc_vmsumubm(aCPU);
+        }
     case 19:
-        if (aCPU.current_opc & PPC_OPC_Rc)
+        if (aCPU.current_opc & PPC_OPC_Rc) {
             return ppc_opc_vmsumuhs(aCPU);
-        else
+        } else {
             return ppc_opc_vmsumuhm(aCPU);
+        }
     case 20:
-        if (aCPU.current_opc & PPC_OPC_Rc)
+        if (aCPU.current_opc & PPC_OPC_Rc) {
             return ppc_opc_vmsumshs(aCPU);
-        else
+        } else {
             return ppc_opc_vmsumshm(aCPU);
+        }
     case 21:
-        if (aCPU.current_opc & PPC_OPC_Rc)
+        if (aCPU.current_opc & PPC_OPC_Rc) {
             return ppc_opc_vperm(aCPU);
-        else
+        } else {
             return ppc_opc_vsel(aCPU);
+        }
     case 22: return ppc_opc_vsldoi(aCPU);
     case 23:
-        if (aCPU.current_opc & PPC_OPC_Rc)
+        if (aCPU.current_opc & PPC_OPC_Rc) {
             return ppc_opc_vnmsubfp(aCPU);
-        else
+        } else {
             return ppc_opc_vmaddfp(aCPU);
+        }
     }
-    switch(ext & 0x1ff)
-    {
+    switch (ext & 0x1ff) {
     case 3: return ppc_opc_vcmpequbx(aCPU);
     case 35: return ppc_opc_vcmpequhx(aCPU);
     case 67: return ppc_opc_vcmpequwx(aCPU);
@@ -911,14 +914,28 @@ static int ppc_opc_group_v(PPC_CPU_State &aCPU)
 
 static JITCFlow ppc_opc_gen_group_v(JITC &jitc)
 {
-    // Route all AltiVec opcodes through interpreter for correctness
+    uint32 ext = PPC_OPC_EXT(jitc.current_opc);
+
+    switch (ext & 0x1ff) {
+    case 3: return ppc_opc_gen_vcmpequbx(jitc);
+    case 35: return ppc_opc_gen_vcmpequhx(jitc);
+    case 67: return ppc_opc_gen_vcmpequwx(jitc);
+    }
+
+    if (ext < (sizeof ppc_opc_table_gen_groupv / sizeof ppc_opc_table_gen_groupv[0])) {
+        if (ppc_opc_table_gen_groupv[ext] != ppc_opc_gen_invalid) {
+            return ppc_opc_table_gen_groupv[ext](jitc);
+        }
+    }
+
+    // Route unimplemented AltiVec opcodes through interpreter for correctness
     ppc_opc_gen_interpret(jitc, ppc_opc_group_v);
     return flowContinue;
 }
 
 static void ppc_opc_init_groupv()
 {
-    for (uint i=0; i<(sizeof ppc_opc_table_groupv / sizeof ppc_opc_table_groupv[0]); i++) {
+    for (uint i = 0; i < (sizeof ppc_opc_table_groupv / sizeof ppc_opc_table_groupv[0]); i++) {
         ppc_opc_table_groupv[i] = ppc_opc_invalid;
         ppc_opc_table_gen_groupv[i] = ppc_opc_gen_invalid;
     }
@@ -1040,6 +1057,25 @@ static void ppc_opc_init_groupv()
     ppc_opc_table_groupv[928] = ppc_opc_vsubshs;
     ppc_opc_table_groupv[960] = ppc_opc_vsubsws;
     ppc_opc_table_groupv[964] = ppc_opc_vsumsws;
+
+    // Native AArch64 NEON AltiVec JIT generators
+    ppc_opc_table_gen_groupv[0] = ppc_opc_gen_vaddubm;
+    ppc_opc_table_gen_groupv[5] = ppc_opc_gen_vaddfp;
+    ppc_opc_table_gen_groupv[32] = ppc_opc_gen_vadduhm;
+    ppc_opc_table_gen_groupv[37] = ppc_opc_gen_vsubfp;
+    ppc_opc_table_gen_groupv[64] = ppc_opc_gen_vadduwm;
+    ppc_opc_table_gen_groupv[326] = ppc_opc_gen_vspltw;
+    ppc_opc_table_gen_groupv[390] = ppc_opc_gen_vspltisb;
+    ppc_opc_table_gen_groupv[422] = ppc_opc_gen_vspltish;
+    ppc_opc_table_gen_groupv[454] = ppc_opc_gen_vspltisw;
+    ppc_opc_table_gen_groupv[512] = ppc_opc_gen_vsububm;
+    ppc_opc_table_gen_groupv[514] = ppc_opc_gen_vand;
+    ppc_opc_table_gen_groupv[544] = ppc_opc_gen_vsubuhm;
+    ppc_opc_table_gen_groupv[546] = ppc_opc_gen_vandc;
+    ppc_opc_table_gen_groupv[576] = ppc_opc_gen_vsubuwm;
+    ppc_opc_table_gen_groupv[578] = ppc_opc_gen_vor;
+    ppc_opc_table_gen_groupv[610] = ppc_opc_gen_vxor;
+    ppc_opc_table_gen_groupv[642] = ppc_opc_gen_vnor;
 }
 
 static ppc_opc_function ppc_opc_table_main[64] = {

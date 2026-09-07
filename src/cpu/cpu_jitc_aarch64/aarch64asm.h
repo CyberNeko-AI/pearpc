@@ -99,7 +99,7 @@ A64Instr a64_MOVw(int rd, int rn); // MOV Wd, Wn
 
 /* Logical (register) with flag setting */
 A64Instr a64_ANDSw_reg(int rd, int rn, int rm); // ANDS Wd, Wn, Wm (sets flags)
-A64Instr a64_TSTw_reg(int rn, int rm);           // TST Wn, Wm = ANDS WZR, Wn, Wm
+A64Instr a64_TSTw_reg(int rn, int rm);          // TST Wn, Wm = ANDS WZR, Wn, Wm
 
 /* Logical (immediate) with flag setting */
 A64Instr a64_ANDSw_imm(int rd, int rn, int immr, int imms); // ANDS Wd, Wn, #bitmask
@@ -107,7 +107,7 @@ A64Instr a64_TSTw_imm(int rn, int immr, int imms);          // TST Wn, #bitmask
 
 /* Multiply */
 A64Instr a64_MADDw(int rd, int rn, int rm, int ra); // MADD Wd, Wn, Wm, Wa
-A64Instr a64_MULw(int rd, int rn, int rm);           // MUL Wd, Wn, Wm = MADD Wd, Wn, Wm, WZR
+A64Instr a64_MULw(int rd, int rn, int rm);          // MUL Wd, Wn, Wm = MADD Wd, Wn, Wm, WZR
 
 /* Negate */
 A64Instr a64_NEGw(int rd, int rm); // NEG Wd, Wm = SUB Wd, WZR, Wm
@@ -115,12 +115,12 @@ A64Instr a64_NEGw(int rd, int rm); // NEG Wd, Wm = SUB Wd, WZR, Wm
 /* Shifts */
 A64Instr a64_LSLw_imm(int rd, int rn, int shift);
 A64Instr a64_LSRw_imm(int rd, int rn, int shift);
-A64Instr a64_LSR_imm(int rd, int rn, int shift);  // LSR Xd, Xn, #shift (64-bit)
+A64Instr a64_LSR_imm(int rd, int rn, int shift); // LSR Xd, Xn, #shift (64-bit)
 A64Instr a64_ASRw_imm(int rd, int rn, int shift);
 A64Instr a64_RORw_imm(int rd, int rn, int shift); // ROR Wd, Wn, #shift = EXTR Wd, Wn, Wn, #shift
-A64Instr a64_LSLw_reg(int rd, int rn, int rm);     // LSL Wd, Wn, Wm = LSLV
-A64Instr a64_LSRw_reg(int rd, int rn, int rm);     // LSR Wd, Wn, Wm = LSRV
-A64Instr a64_RORw_reg(int rd, int rn, int rm);     // ROR Wd, Wn, Wm = RORV
+A64Instr a64_LSLw_reg(int rd, int rn, int rm);    // LSL Wd, Wn, Wm = LSLV
+A64Instr a64_LSRw_reg(int rd, int rn, int rm);    // LSR Wd, Wn, Wm = LSRV
+A64Instr a64_RORw_reg(int rd, int rn, int rm);    // ROR Wd, Wn, Wm = RORV
 
 /* Logical (immediate) */
 A64Instr a64_ORRw_imm(int rd, int rn, int immr, int imms); // ORR Wd, Wn, #bitmask
@@ -180,47 +180,47 @@ A64Instr a64_TBZ(int rt, int bit, sint32 offset);  // TBZ Xt, #bit, #offset
 A64Instr a64_TBNZ(int rt, int bit, sint32 offset); // TBNZ Xt, #bit, #offset
 
 /* Conditional select */
-A64Instr a64_CSELw(int rd, int rn, int rm, A64Cond cond);   // CSEL Wd, Wn, Wm, cond
-A64Instr a64_CSINCw(int rd, int rn, int rm, A64Cond cond);  // CSINC Wd, Wn, Wm, cond
+A64Instr a64_CSELw(int rd, int rn, int rm, A64Cond cond);  // CSEL Wd, Wn, Wm, cond
+A64Instr a64_CSINCw(int rd, int rn, int rm, A64Cond cond); // CSINC Wd, Wn, Wm, cond
 
 /* Bit field operations */
 A64Instr a64_BFIw(int rd, int rn, int lsb, int width); // BFI Wd, Wn, #lsb, #width
 
 /* Data processing (2 source) */
-A64Instr a64_UDIVw(int rd, int rn, int rm);  // UDIV Wd, Wn, Wm
-A64Instr a64_SDIVw(int rd, int rn, int rm);  // SDIV Wd, Wn, Wm
-A64Instr a64_LSLVw(int rd, int rn, int rm);  // LSLV Wd, Wn, Wm
-A64Instr a64_LSRVw(int rd, int rn, int rm);  // LSRV Wd, Wn, Wm
+A64Instr a64_UDIVw(int rd, int rn, int rm); // UDIV Wd, Wn, Wm
+A64Instr a64_SDIVw(int rd, int rn, int rm); // SDIV Wd, Wn, Wm
+A64Instr a64_LSLVw(int rd, int rn, int rm); // LSLV Wd, Wn, Wm
+A64Instr a64_LSRVw(int rd, int rn, int rm); // LSRV Wd, Wn, Wm
 
 /* 64-bit shift variable (for PPC shift-by-register with 6-bit amounts) */
-A64Instr a64_LSLV(int rd, int rn, int rm);   // LSLV Xd, Xn, Xm
-A64Instr a64_LSRV(int rd, int rn, int rm);   // LSRV Xd, Xn, Xm
-A64Instr a64_ASRV(int rd, int rn, int rm);   // ASRV Xd, Xn, Xm
-A64Instr a64_SXTW(int rd, int rn);           // SXTW Xd, Wn
+A64Instr a64_LSLV(int rd, int rn, int rm); // LSLV Xd, Xn, Xm
+A64Instr a64_LSRV(int rd, int rn, int rm); // LSRV Xd, Xn, Xm
+A64Instr a64_ASRV(int rd, int rn, int rm); // ASRV Xd, Xn, Xm
+A64Instr a64_SXTW(int rd, int rn);         // SXTW Xd, Wn
 
 /* Widening multiply */
-A64Instr a64_UMULL(int rd, int rn, int rm);   // UMULL Xd, Wn, Wm
-A64Instr a64_SMULL(int rd, int rn, int rm);   // SMULL Xd, Wn, Wm
+A64Instr a64_UMULL(int rd, int rn, int rm); // UMULL Xd, Wn, Wm
+A64Instr a64_SMULL(int rd, int rn, int rm); // SMULL Xd, Wn, Wm
 
 /* Logical (register) with invert */
-A64Instr a64_ORNw(int rd, int rn, int rm);    // ORN Wd, Wn, Wm = Wn | ~Wm
-A64Instr a64_MVNw(int rd, int rm);            // MVN Wd, Wm = ~Wm
+A64Instr a64_ORNw(int rd, int rn, int rm); // ORN Wd, Wn, Wm = Wn | ~Wm
+A64Instr a64_MVNw(int rd, int rm);         // MVN Wd, Wm = ~Wm
 
 /* Count leading zeros */
-A64Instr a64_CLZw(int rd, int rn);            // CLZ Wd, Wn
+A64Instr a64_CLZw(int rd, int rn); // CLZ Wd, Wn
 
 /* Floating-point load/store (D-register, unsigned offset scaled by 8) */
-A64Instr a64_LDR_D(int dt, int rn, int uimm);  // LDR Dt, [Xn, #uimm]
-A64Instr a64_STR_D(int dt, int rn, int uimm);  // STR Dt, [Xn, #uimm]
+A64Instr a64_LDR_D(int dt, int rn, int uimm); // LDR Dt, [Xn, #uimm]
+A64Instr a64_STR_D(int dt, int rn, int uimm); // STR Dt, [Xn, #uimm]
 
 /* Floating-point arithmetic (double-precision) */
-A64Instr a64_FADD_D(int dd, int dn, int dm);   // FADD Dd, Dn, Dm
-A64Instr a64_FSUB_D(int dd, int dn, int dm);   // FSUB Dd, Dn, Dm
-A64Instr a64_FMUL_D(int dd, int dn, int dm);   // FMUL Dd, Dn, Dm
-A64Instr a64_FDIV_D(int dd, int dn, int dm);   // FDIV Dd, Dn, Dm
-A64Instr a64_FNEG_D(int dd, int dn);           // FNEG Dd, Dn
-A64Instr a64_FABS_D(int dd, int dn);           // FABS Dd, Dn
-A64Instr a64_FSQRT_D(int dd, int dn);          // FSQRT Dd, Dn
+A64Instr a64_FADD_D(int dd, int dn, int dm); // FADD Dd, Dn, Dm
+A64Instr a64_FSUB_D(int dd, int dn, int dm); // FSUB Dd, Dn, Dm
+A64Instr a64_FMUL_D(int dd, int dn, int dm); // FMUL Dd, Dn, Dm
+A64Instr a64_FDIV_D(int dd, int dn, int dm); // FDIV Dd, Dn, Dm
+A64Instr a64_FNEG_D(int dd, int dn);         // FNEG Dd, Dn
+A64Instr a64_FABS_D(int dd, int dn);         // FABS Dd, Dn
+A64Instr a64_FSQRT_D(int dd, int dn);        // FSQRT Dd, Dn
 
 /* Floating-point fused multiply-add (double-precision) */
 A64Instr a64_FMADD_D(int dd, int dn, int dm, int da);  // FMADD Dd, Dn, Dm, Da  (Da + Dn*Dm)
@@ -229,28 +229,63 @@ A64Instr a64_FNMADD_D(int dd, int dn, int dm, int da); // FNMADD Dd, Dn, Dm, Da 
 A64Instr a64_FNMSUB_D(int dd, int dn, int dm, int da); // FNMSUB Dd, Dn, Dm, Da (Dn*Dm - Da)
 
 /* Floating-point conversion */
-A64Instr a64_FCVT_S_D(int sd, int dn);         // FCVT Sd, Dn (double to single)
-A64Instr a64_FCVT_D_S(int dd, int sn);         // FCVT Dd, Sn (single to double)
+A64Instr a64_FCVT_S_D(int sd, int dn); // FCVT Sd, Dn (double to single)
+A64Instr a64_FCVT_D_S(int dd, int sn); // FCVT Dd, Sn (single to double)
 
 /* Floating-point compare */
-A64Instr a64_FCMP_D(int dn, int dm);           // FCMP Dn, Dm
-A64Instr a64_FCMP_D_zero(int dn);              // FCMP Dn, #0.0
+A64Instr a64_FCMP_D(int dn, int dm); // FCMP Dn, Dm
+A64Instr a64_FCMP_D_zero(int dn);    // FCMP Dn, #0.0
 
 /* Floating-point to integer conversion */
-A64Instr a64_FCVTZS_W_D(int wd, int dn);       // FCVTZS Wd, Dn (double to int32, round toward zero)
+A64Instr a64_FCVTZS_W_D(int wd, int dn); // FCVTZS Wd, Dn (double to int32, round toward zero)
 
 /* Floating-point conditional select */
 A64Instr a64_FCSEL_D(int dd, int dn, int dm, A64Cond cond); // FCSEL Dd, Dn, Dm, cond
 
 /* Floating-point move (GPR <-> FPR) */
-A64Instr a64_FMOV_D_X(int dd, int xn);         // FMOV Dd, Xn (64-bit GPR to FPR)
-A64Instr a64_FMOV_X_D(int xd, int dn);         // FMOV Xd, Dn (FPR to 64-bit GPR)
-A64Instr a64_FMOV_S_W(int sd, int wn);         // FMOV Sd, Wn (32-bit GPR to FPR)
-A64Instr a64_FMOV_W_S(int wd, int sn);         // FMOV Wd, Sn (FPR to 32-bit GPR)
+A64Instr a64_FMOV_D_X(int dd, int xn); // FMOV Dd, Xn (64-bit GPR to FPR)
+A64Instr a64_FMOV_X_D(int xd, int dn); // FMOV Xd, Dn (FPR to 64-bit GPR)
+A64Instr a64_FMOV_S_W(int sd, int wn); // FMOV Sd, Wn (32-bit GPR to FPR)
+A64Instr a64_FMOV_W_S(int wd, int sn); // FMOV Wd, Sn (FPR to 32-bit GPR)
+
+/* SIMD / Vector load/store (128-bit Q-register, unsigned offset scaled by 16) */
+A64Instr a64_LDR_Q(int vt, int rn, int uimm); // LDR Qt, [Xn, #uimm]
+A64Instr a64_STR_Q(int vt, int rn, int uimm); // STR Qt, [Xn, #uimm]
+
+/* SIMD 3-register logical */
+A64Instr a64_AND_V(int vd, int vn, int vm); // AND Vd.16B, Vn.16B, Vm.16B
+A64Instr a64_BIC_V(int vd, int vn, int vm); // BIC Vd.16B, Vn.16B, Vm.16B
+A64Instr a64_ORR_V(int vd, int vn, int vm); // ORR Vd.16B, Vn.16B, Vm.16B
+A64Instr a64_ORN_V(int vd, int vn, int vm); // ORN Vd.16B, Vn.16B, Vm.16B
+A64Instr a64_EOR_V(int vd, int vn, int vm); // EOR Vd.16B, Vn.16B, Vm.16B
+A64Instr a64_MVN_V(int vd, int vn);         // MVN Vd.16B, Vn.16B (bitwise NOT)
+
+/* SIMD 3-register integer arithmetic */
+A64Instr a64_ADD_V_16B(int vd, int vn, int vm); // ADD Vd.16B, Vn.16B, Vm.16B
+A64Instr a64_ADD_V_8H(int vd, int vn, int vm);  // ADD Vd.8H, Vn.8H, Vm.8H
+A64Instr a64_ADD_V_4S(int vd, int vn, int vm);  // ADD Vd.4S, Vn.4S, Vm.4S
+A64Instr a64_SUB_V_16B(int vd, int vn, int vm); // SUB Vd.16B, Vn.16B, Vm.16B
+A64Instr a64_SUB_V_8H(int vd, int vn, int vm);  // SUB Vd.8H, Vn.8H, Vm.8H
+A64Instr a64_SUB_V_4S(int vd, int vn, int vm);  // SUB Vd.4S, Vn.4S, Vm.4S
+
+/* SIMD floating-point */
+A64Instr a64_FADD_V_4S(int vd, int vn, int vm); // FADD Vd.4S, Vn.4S, Vm.4S
+A64Instr a64_FSUB_V_4S(int vd, int vn, int vm); // FSUB Vd.4S, Vn.4S, Vm.4S
+
+/* SIMD duplicate/broadcast (splat) */
+A64Instr a64_DUP_V_4S_reg(int vd, int wn);            // DUP Vd.4S, Wn
+A64Instr a64_DUP_V_8H_reg(int vd, int wn);            // DUP Vd.8H, Wn
+A64Instr a64_DUP_V_16B_reg(int vd, int wn);           // DUP Vd.16B, Wn
+A64Instr a64_DUP_V_4S_elem(int vd, int vn, int lane); // DUP Vd.4S, Vn.S[lane]
+
+/* SIMD compare */
+A64Instr a64_CMEQ_V_4S(int vd, int vn, int vm);  // CMEQ Vd.4S, Vn.4S, Vm.4S
+A64Instr a64_CMEQ_V_8H(int vd, int vn, int vm);  // CMEQ Vd.8H, Vn.8H, Vm.8H
+A64Instr a64_CMEQ_V_16B(int vd, int vn, int vm); // CMEQ Vd.16B, Vn.16B, Vm.16B
 
 /* Misc */
 A64Instr a64_NOP();
-A64Instr a64_REV(int rd, int rn);  // byte swap 64-bit
+A64Instr a64_REV(int rd, int rn);    // byte swap 64-bit
 A64Instr a64_REVw(int rd, int rn);   // byte swap 32-bit
 A64Instr a64_REV16w(int rd, int rn); // byte swap within 16-bit halves
 
@@ -266,7 +301,9 @@ A64Instr a64_ADR(int rd, sint32 offset);
  */
 static inline bool a64_encode_log_imm32(uint32 val, int &out_immr, int &out_imms)
 {
-    if (val == 0 || val == 0xFFFFFFFF) return false; // not encodable
+    if (val == 0 || val == 0xFFFFFFFF) {
+        return false; // not encodable
+    }
 
     // Try each element size: 2, 4, 8, 16, 32
     for (int size = 32; size >= 2; size >>= 1) {
@@ -276,13 +313,20 @@ static inline bool a64_encode_log_imm32(uint32 val, int &out_immr, int &out_imms
         // Check that val is a repeating pattern of this element
         bool repeats = true;
         for (int i = size; i < 32; i += size) {
-            if (((val >> i) & mask) != elem) { repeats = false; break; }
+            if (((val >> i) & mask) != elem) {
+                repeats = false;
+                break;
+            }
         }
-        if (!repeats) continue;
+        if (!repeats) {
+            continue;
+        }
 
         // elem must be a rotated contiguous run of ones within 'size' bits
         // Rotate elem to find the run: count trailing zeros, rotate, count ones
-        if (elem == 0 || elem == mask) continue; // all-0 or all-1 not valid at this size
+        if (elem == 0 || elem == mask) {
+            continue; // all-0 or all-1 not valid at this size
+        }
 
         // Double the element to handle wrap-around
         uint64 doubled = ((uint64)elem << size) | elem;
@@ -293,7 +337,9 @@ static inline bool a64_encode_log_imm32(uint32 val, int &out_immr, int &out_imms
         // Count consecutive ones from bit 0
         int ones = __builtin_ctz(~rotated);
         // Check it's a clean run
-        if (rotated != ((1u << ones) - 1)) continue;
+        if (rotated != ((1u << ones) - 1)) {
+            continue;
+        }
 
         // Encode: immr = (size - lo) % size, imms = (ones - 1) | size_encoding
         out_immr = (size - lo) % size;
@@ -307,9 +353,9 @@ static inline bool a64_encode_log_imm32(uint32 val, int &out_immr, int &out_imms
         switch (size) {
         case 32: size_enc = 0b000000; break;
         case 16: size_enc = 0b100000; break;
-        case  8: size_enc = 0b110000; break;
-        case  4: size_enc = 0b111000; break;
-        case  2: size_enc = 0b111100; break;
+        case 8: size_enc = 0b110000; break;
+        case 4: size_enc = 0b111000; break;
+        case 2: size_enc = 0b111100; break;
         default: continue;
         }
         // imms = size_enc | (ones - 1), but the size_enc sets the upper bits
@@ -330,7 +376,9 @@ static inline bool a64_encode_log_imm32(uint32 val, int &out_immr, int &out_imms
  */
 static inline bool a64_encode_log_imm64(uint64 val, int &out_N, int &out_immr, int &out_imms)
 {
-    if (val == 0 || val == 0xFFFFFFFFFFFFFFFFULL) return false;
+    if (val == 0 || val == 0xFFFFFFFFFFFFFFFFULL) {
+        return false;
+    }
 
     // Check if it fits the 32-bit repeating pattern (N=0)
     uint32 lo = (uint32)val;
@@ -352,7 +400,9 @@ static inline bool a64_encode_log_imm64(uint64 val, int &out_N, int &out_immr, i
     int ones = __builtin_ctzll(~rotated);
     // Verify it's a clean contiguous run
     uint64 expected = (ones == 64) ? ~0ULL : ((1ULL << ones) - 1);
-    if (rotated != expected) return false;
+    if (rotated != expected) {
+        return false;
+    }
 
     out_N = 1;
     out_immr = (64 - lo_bit) % 64;
@@ -366,21 +416,36 @@ static inline uint a64_movw_size(uint32 imm)
 {
     uint16 lo = imm & 0xFFFF;
     uint16 hi = (imm >> 16) & 0xFFFF;
-    if (hi == 0xFFFF && lo != 0xFFFF) return 4; // MOVN
-    if (lo == 0xFFFF && hi != 0xFFFF && hi != 0) return 4; // MOVN shifted
-    if (lo == 0 && hi != 0) return 4; // single MOVZ shifted
-    return hi ? 8 : 4;               // MOVZ + optional MOVK
+    if (hi == 0xFFFF && lo != 0xFFFF) {
+        return 4; // MOVN
+    }
+    if (lo == 0xFFFF && hi != 0xFFFF && hi != 0) {
+        return 4; // MOVN shifted
+    }
+    if (lo == 0 && hi != 0) {
+        return 4; // single MOVZ shifted
+    }
+    return hi ? 8 : 4; // MOVZ + optional MOVK
 }
 
 static inline uint a64_mov64_size(uint64 imm)
 {
     uint s = 4;
-    if (imm >> 16) s += 4;
-    if (imm >> 32) s += 4;
-    if (imm >> 48) s += 4;
+    if (imm >> 16) {
+        s += 4;
+    }
+    if (imm >> 32) {
+        s += 4;
+    }
+    if (imm >> 48) {
+        s += 4;
+    }
     return s;
 }
 
-static inline uint a64_bl_size(uint64 addr) { return a64_mov64_size(addr) + 4; }
+static inline uint a64_bl_size(uint64 addr)
+{
+    return a64_mov64_size(addr) + 4;
+}
 
 #endif
