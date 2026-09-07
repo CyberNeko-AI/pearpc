@@ -434,6 +434,7 @@ void JITC::asmBL(NativeAddress to)
 
 void JITC::asmB(NativeAddress to)
 {
+    emitAssure(4);
     sint64 offset = (sint64)(to - currentPage->tcp);
     sint32 imm26 = (sint32)(offset / 4);
     if (imm26 <= 0x1FFFFFF && imm26 >= -0x2000000) {
@@ -457,10 +458,10 @@ void JITC::asmCALL(NativeAddress to)
 
 void JITC::asmCALL_cpu(int stubIndex)
 {
+    emitAssure(8);
     NativeAddress target = gCPU->stubs[stubIndex];
     sint64 offset = (sint64)(target - currentPage->tcp);
     sint32 imm26 = (sint32)(offset / 4);
-    emitAssure(8);
     if (imm26 <= 0x1FFFFFF && imm26 >= -0x2000000) {
         emit32(a64_BL((sint32)offset));
         emit32(a64_NOP());
