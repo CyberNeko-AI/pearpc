@@ -160,3 +160,25 @@ make -j4
 若同时接有光盘，使用 `prom_env_bootpath = "disk0:9"` 明确选择硬盘；当前用户配置关闭从盘光驱时无需此项。
 诊断时可设置 `prom_env_machargs = "-v"`，确认 `BSD root: disk0s9`。
 不要把历史日志中仅出现设备扫描视作挂载成功，或把本轮日志条数当作正式性能基准。
+
+## 自动启动时跳过不可启动光盘（2026-09-08）
+
+当配置同时启用硬盘和光驱、`prom_bootmethod = "auto"`，而光盘包含可识别但无法打开的分区时，旧代码会在第一个光盘候选上调用 `mInstantiateBootFile()`，随后直接报告 `can't open boot file` 并终止模拟器。此时硬盘本身是可启动的，失败来自自动启动候选没有回退。
+
+`src/io/prom/promboot.cc` 现在在未设置 `prom_env_bootpath` 的 auto 模式下：
+
+1. 按现有候选顺序尝试设备；
+2. 启动文件打不开或超过 64 MiB 时，记录 warning 并跳过当前候选；
+3. 继续尝试下一个可启动分区；
+4. 所有候选都失败时返回普通启动失败，而不再对单个坏候选调用 fatal。
+
+设置 `prom_env_bootpath` 后仍选择指定设备；指定设备不可用时继续报告错误，避免掩盖配置错误。
+
+使用硬盘 `osx_hd.img` 加载不可启动的 `osx102/osx_10.2_disk2.iso` 进行回归，输出确认：
+
+```text
+[IO/PROM] <Warning> can't open boot file on 'cdrom0:9'; trying next boot device
+Loading XCOFF...
+```
+
+随后进入硬盘启动路径。默认静默构建中的 JIT 调试输出也已保持关闭。

@@ -1157,6 +1157,7 @@ static uint64 jitcHits = 0, jitcNewTranslations = 0, jitcNewEntries = 0;
 extern "C" NativeAddress jitcNewPC(JITC &jitc, uint32 entry)
 {
     traceInit();
+#if PEARPC_DEBUG_TRACE
     // Log EA→PA mapping for kernel-range addresses
     {
         extern PPC_CPU_State *gCPU;
@@ -1220,14 +1221,17 @@ extern "C" NativeAddress jitcNewPC(JITC &jitc, uint32 entry)
             fflush(gTraceLog);
         }
     }
+#endif
     // Catch dispatch from PROM address range
     {
         extern PPC_CPU_State *gCPU;
         uint32 ccb = gCPU->current_code_base;
         uint32 pc = gCPU->pc;
         if (pc >= 0xBF000000 && pc < 0xC0000000) {
+#if PEARPC_DEBUG_TRACE
             fprintf(stderr, "[PROM-DISPATCH] pc=%08x pa=%08x msr=%08x lr=%08x ccb=%08x\n", pc, entry, gCPU->msr,
                     gCPU->lr, ccb);
+#endif
             static int promCount = 0;
             if (++promCount >= 3) {
                 if (gTraceLog) {
@@ -1259,6 +1263,7 @@ extern "C" NativeAddress jitcNewPC(JITC &jitc, uint32 entry)
             val = gCPU->current_code_base;
         }
         if (corrupt) {
+#if PEARPC_DEBUG_TRACE
             fprintf(stderr, "[CORRUPT] %s=%08x at dispatch pa=%08x\n", field, val, entry);
             fprintf(stderr, "  pc=%08x npc=%08x ccb=%08x msr=%08x lr=%08x opc=%08x\n", gCPU->pc, gCPU->npc,
                     gCPU->current_code_base, gCPU->msr, gCPU->lr, gCPU->current_opc);
@@ -1267,6 +1272,7 @@ extern "C" NativeAddress jitcNewPC(JITC &jitc, uint32 entry)
             if (gTraceLog) {
                 fflush(gTraceLog);
             }
+#endif
             PPC_CPU_ERR("CPU state corrupt: %s=%08x at dispatch pa=%08x\n", field, val, entry);
         }
     }
@@ -1465,7 +1471,7 @@ bool JITC::init(uint maxClientPages, uint32 tcSize)
     extern byte *gTranslationCacheBase;
     gTranslationCacheBase = translationCache;
 
-    ht_printf("translation cache: %p (aarch64 JIT)\n", translationCache);
+    PPC_DIAG_TRACE("translation cache: %p (aarch64 JIT)\n", translationCache);
 
     if (!translationCache) {
         return false;

@@ -1457,6 +1457,9 @@ bool prom_user_boot_partition(File *&ret_file, uint32 &size, bool &direct, uint3
 	key2digit[KEY_9] = 9;
 
 	bool only_bootable = true;
+	const bool automatic_boot = (gPromBootMethod == prombmAuto);
+	const bool allow_boot_fallback = automatic_boot && gPromBootPath.length() == 0;
+	uint auto_skip_choice = 0;
 
 	while (1) {
 		if (gPromBootMethod == prombmSelect) gDisplay->printf("Which partition do you want to boot?\n");
@@ -1493,7 +1496,13 @@ bool prom_user_boot_partition(File *&ret_file, uint32 &size, bool &direct, uint3
 				}
 			}
 		} else {
-			choice = 1;
+			choice = 0;
+			for (uint i = 0; i < brs.count(); i++) {
+				if (i + 1 != auto_skip_choice) {
+					choice = i + 1;
+					break;
+				}
+			}
 			if (gPromBootPath.length() > 0) {
 				for (uint i = 0; i < brs.count(); i++) {
 					BootRec *bootrec = dynamic_cast<BootRec *>(brs[i]);
@@ -1523,12 +1532,15 @@ bool prom_user_boot_partition(File *&ret_file, uint32 &size, bool &direct, uint3
 			}
 		}
 		if (choice == 0) {
+			if (automatic_boot) {
+				IO_PROM_WARN("no usable boot partition found\n");
+				return false;
+			}
 			gDisplay->printf("\n\n");
 			only_bootable = !only_bootable;
 			read_partitions(brs, only_bootable);			
 			continue;
 		}
-		gPromBootMethod = prombmSelect;
 		if ((choice > 0) && (choice <= brs.count())) {
 			choice--;
 			BootRec *bootrec = dynamic_cast<BootRec *>(brs[choice]);
@@ -1545,13 +1557,24 @@ bool prom_user_boot_partition(File *&ret_file, uint32 &size, bool &direct, uint3
 			File *bootFile = bootrec->pe->mInstantiateBootFile(rawFile,
 				bootrec->pe->mInstantiateBootFilePrivData);
 			if (!bootFile) {
+				if (allow_boot_fallback) {
+					IO_PROM_WARN("can't open boot file on '%y:%d'; trying next boot device\n",
+						bootrec->devname, bootrec->partnum);
+					auto_skip_choice = choice + 1;
+					continue;
+				}
 				IO_PROM_ERR("can't open boot file\n");
 				return false;
 			}
+			gPromBootMethod = prombmSelect;
 			uint bootFileSize = bootFile->getSize();
 			if (bootFileSize > 64*1024*1024) {
 				gDisplay->printf("Boot file too large. size=%d (>64MB)\n", bootFileSize);
-				continue;
+				if (allow_boot_fallback) {
+					auto_skip_choice = choice + 1;
+					continue;
+				}
+				return false;
 			}
 			// set bootpath
 			char bootpath[1024];
