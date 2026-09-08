@@ -398,7 +398,7 @@ public:
 		IO_IDE_TRACE("MRDMODE: %02x\n", mConfig[MRDMODE]);
 		bool blocked = (mConfig[MRDMODE] & MRDMODE_BLK_CH0) != 0;
 		bool nien = (gIDEState.state[gIDEState.drive].outreg & IDE_OUTPUT_INT) != 0;
-		ht_printf("[IDE-IRQ] raise bus=%d blk=%d nien=%d irq_line=%d\n", bus, blocked, nien, mConfig[0x3c]);
+        PPC_DIAG_TRACE("[IDE-IRQ] raise bus=%d blk=%d nien=%d irq_line=%d\n", bus, blocked, nien, mConfig[0x3c]);
 		if (!nien && !blocked) {
 			pic_raise_interrupt(mConfig[0x3c]);
 		}
@@ -407,7 +407,7 @@ public:
 	
 	void cancelInterrupt(int bus)
 	{
-		ht_printf("[IDE-IRQ] cancel bus=%d\n", bus);
+        PPC_DIAG_TRACE("[IDE-IRQ] cancel bus=%d\n", bus);
 		pic_cancel_interrupt(IO_PIC_IRQ_IDE0);
 		mConfig[MRDMODE] &= ~(MRDMODE_INTR_CH0 << bus);
 	}
@@ -1349,7 +1349,7 @@ void receive_atapi_packet()
 	
 	bool bmide_start_dma(bool startbit)
 	{
-		ht_printf("[BMIDE-DMA] enter drive=%d start=%d mode=%d cr=0x%02x sr=0x%02x lba=%u count=%u prd=0x%08x\n",
+        PPC_DIAG_TRACE("[BMIDE-DMA] enter drive=%d start=%d mode=%d cr=0x%02x sr=0x%02x lba=%u count=%u prd=0x%08x\n",
 			gIDEState.drive, startbit, gIDEState.state[gIDEState.drive].mode,
 			mConfig[BMIDECR0], mConfig[BMIDESR0],
 			gIDEState.state[gIDEState.drive].dma_lba_start,
@@ -1387,11 +1387,11 @@ void receive_atapi_packet()
 			}
 			mConfig[BMIDESR0] &= ~BM_IDE_SR_ERROR;
 			mConfig[BMIDESR0] |= BM_IDE_SR_INTERRUPT;
-			ht_printf("[BMIDE-DMA] complete exhausted=%d sr=0x%02x\n", prd_exhausted, mConfig[BMIDESR0]);
+            PPC_DIAG_TRACE("[BMIDE-DMA] complete exhausted=%d sr=0x%02x\n", prd_exhausted, mConfig[BMIDESR0]);
 			raiseInterrupt(0);
 			return true;
 		}
-		ht_printf("[BMIDE-DMA] failed sr=0x%02x\n", mConfig[BMIDESR0]);
+        IO_IDE_WARN("[BMIDE-DMA] failed sr=0x%02x\n", mConfig[BMIDESR0]);
 		return false;
 	}
 	
@@ -1401,7 +1401,7 @@ void receive_atapi_packet()
 		switch (port) {
 		case 0:
 			if (size==1) {
-				ht_printf("[BMIDE] CR0 <- 0x%02x\n", data);
+                PPC_DIAG_TRACE("[BMIDE] CR0 <- 0x%02x\n", data);
 				byte prev_command = mConfig[BMIDECR0];
 				mConfig[BMIDECR0] = data & BM_IDE_CR_MASK;
 
@@ -1419,7 +1419,7 @@ void receive_atapi_packet()
 			}
 			break;
 		case 1: {
-			ht_printf("[BMIDE] MRDMODE <- 0x%02x\n", data);
+            PPC_DIAG_TRACE("[BMIDE] MRDMODE <- 0x%02x\n", data);
 			IO_IDE_TRACE("bmide MRDMODE <- %02x\n", data);
 			mConfig[MRDMODE] &= ~(MRDMODE_BLK_CH0 | MRDMODE_BLK_CH1);
 			mConfig[MRDMODE] |= data & (MRDMODE_BLK_CH0 | MRDMODE_BLK_CH1);
@@ -1547,7 +1547,7 @@ void receive_atapi_packet()
 			IO_IDE_TRACE("command register (%02x)\n", data);
 			gIDEState.state[gIDEState.drive].current_command = data;
 			gIDEState.one_time_shit = true;
-			ht_printf("[IDE-CMD] drive=%d cmd=0x%02x feat=0x%02x sec_cnt=%d\n",
+            PPC_DIAG_TRACE("[IDE-CMD] drive=%d cmd=0x%02x feat=0x%02x sec_cnt=%d\n",
 				gIDEState.drive, data, gIDEState.state[gIDEState.drive].feature,
 				gIDEState.state[gIDEState.drive].sector_count);
 			switch (data) {
@@ -1786,7 +1786,7 @@ void receive_atapi_packet()
 		}
 		case IDE_ADDRESS_DRV_HEAD: {
 			IO_IDE_TRACE("drive head <- %x\n", data);
-			ht_printf("[IDE-SEL] head=0x%02x drive=%d installed=%d status0=0x%02x status1=0x%02x\n",
+            PPC_DIAG_TRACE("[IDE-SEL] head=0x%02x drive=%d installed=%d status0=0x%02x status1=0x%02x\n",
 				data, (data & IDE_DRIVE_HEAD_SLAVE) ? 1 : 0,
 				gIDEState.config[0].installed, gIDEState.state[0].status, gIDEState.state[1].status);
 			gIDEState.drive_head = data | 0xa0;
@@ -2006,7 +2006,7 @@ void ide_read_reg(uint32 addr, uint32 &data, int size)
 	case IDE_ADDRESS_STATUS: {
 		if (!gIDEState.config[gIDEState.drive].installed) {
 			data = 0;
-			ht_printf("[IDE-STATUS] drive=%d absent\n", gIDEState.drive);
+            PPC_DIAG_TRACE("[IDE-STATUS] drive=%d absent\n", gIDEState.drive);
 			cancelInterrupt(0);
 			return;
 		}

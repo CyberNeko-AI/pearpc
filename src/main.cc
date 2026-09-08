@@ -30,6 +30,7 @@
 #include "cpu/cpu.h"
 //#include "cpu_generic/ppc_tools.h"
 #include "debug/debugger.h"
+#include "debug/tracers.h"
 #include "io/io.h"
 #include "io/graphic/gcard.h"
 #include "io/ide/ide.h"
@@ -537,7 +538,7 @@ int main(int argc, char *argv[])
             exit(1);
         }
 
-        ht_printf("[DBG] cuda_pre_init...\n");
+        PPC_DIAG_TRACE("[DBG] cuda_pre_init...\n");
         cuda_pre_init();
 
         if (!headless) {
@@ -575,7 +576,7 @@ int main(int argc, char *argv[])
             memset(gFrameBuffer, 0, gm.width * gm.height * gm.bytesPerPixel);
         }
 
-        ht_printf("[DBG] io_init...\n");
+        PPC_DIAG_TRACE("[DBG] io_init...\n");
         io_init();
 
         if (!headless) {
@@ -637,7 +638,7 @@ int main(int argc, char *argv[])
         }
 
         // init prom
-        ht_printf("[DBG] prom_init...\n");
+        PPC_DIAG_TRACE("[DBG] prom_init...\n");
         prom_init();
 
         // lock pagetable
@@ -650,7 +651,7 @@ int main(int argc, char *argv[])
 
         testforth();
 
-        ht_printf("[DBG] prom_load_boot_file...\n");
+        PPC_DIAG_TRACE("[DBG] prom_load_boot_file...\n");
         if (!prom_load_boot_file()) {
             ht_printf("cannot find boot file.\n");
             return 1;
@@ -674,7 +675,7 @@ int main(int argc, char *argv[])
             gDisplay->print("now starting client...");
             gDisplay->setAnsiColor(VCP(VC_WHITE, CONSOLE_BG));
         }
-        ht_printf("[DBG] starting client PC=%08x...\n", ppc_cpu_get_pc(0));
+        PPC_DIAG_TRACE("[DBG] starting client PC=%08x...\n", ppc_cpu_get_pc(0));
 
         if (headless) {
             // Headless: run CPU directly on main thread

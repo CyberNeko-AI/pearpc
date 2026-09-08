@@ -1,5 +1,10 @@
 # Mac OS X 硬盘引导故障深度诊断与研判报告
 
+> **2026-09-08 更新**：已实测修复硬盘根分区无法挂载的问题，用户确认能够进入系统。
+> 根因是 `mac-io` 的 `compatible` 字符串列表缺少最后一个 NUL，导致 Heathrow 驱动匹配失败。
+> 下面保留的历史研判中，“IOATABlockStorageDriver 是断裂点”“SET FEATURES 缺少中断”等结论已被后续证据否定。
+> 请以 [本轮修复、验证与启动性能记录](OSX_HD_BOOT_FIX_20260908.md) 为准。
+
 本文档记录了关于 PearPC 运行 Mac OS X 10.2 (Jaguar) 在完成系统安装后，从虚拟硬盘（`osx_hd.img`）默认引导失败问题的**完整修改记录、关键技术发现、底层机制研判与后续解决思路**。
 
 ---
@@ -242,4 +247,3 @@ rg -n 'IDE-|BMIDE-|PCI-|ata|CMD646|IOATA' osx_jit.log osx_generic.log
 ```
 
 若两种 CPU 都没有 ATA 命令，应继续给 `IDE_Controller::readConfig/writeConfig`、`readDeviceIO/writeDeviceIO` 以及 PROM 设备树节点增加访问日志；若只有 generic CPU 进入 ATA 命令路径，则应转向 JIT 的 PCI MMIO/IO 指令执行差异。
-

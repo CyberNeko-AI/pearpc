@@ -39,9 +39,9 @@
 #include "tools/snprintf.h"
 
 #include "configparser.h"
+#include "debug/tracers.h"
 
-//#define DPRINTF(...)
-#define DPRINTF(...) ht_printf("[Display/SDL]: " __VA_ARGS__)
+#define DPRINTF(...) PPC_DIAG_TRACE("[Display/SDL]: " __VA_ARGS__)
 
 #include "syssdl.h"
 
@@ -61,13 +61,13 @@ uint SDLSystemDisplay::bitsPerPixelToXBitmapPad(uint bitsPerPixel)
 
 void SDLSystemDisplay::dumpDisplayChar(const DisplayCharacteristics &chr)
 {
-	fprintf(stderr, "\tdimensions:          %d x %d pixels\n", chr.width, chr.height);
-	fprintf(stderr, "\tpixel size in bytes: %d\n", chr.bytesPerPixel);
-	fprintf(stderr, "\tpixel size in bits:  %d\n", chr.bytesPerPixel*8);
-	fprintf(stderr, "\tred_mask:            %08x (%d bits)\n", MASK(chr.redShift, chr.redSize), chr.redSize);
-	fprintf(stderr, "\tgreen_mask:          %08x (%d bits)\n", MASK(chr.greenShift, chr.greenSize), chr.greenSize);
-	fprintf(stderr, "\tblue_mask:           %08x (%d bits)\n", MASK(chr.blueShift, chr.blueSize), chr.blueSize);
-	fprintf(stderr, "\tdepth:               %d\n", chr.redSize + chr.greenSize + chr.blueSize);
+    PPC_DIAG_TRACE("\tdimensions:          %d x %d pixels\n", chr.width, chr.height);
+    PPC_DIAG_TRACE("\tpixel size in bytes: %d\n", chr.bytesPerPixel);
+    PPC_DIAG_TRACE("\tpixel size in bits:  %d\n", chr.bytesPerPixel*8);
+    PPC_DIAG_TRACE("\tred_mask:            %08x (%d bits)\n", MASK(chr.redShift, chr.redSize), chr.redSize);
+    PPC_DIAG_TRACE("\tgreen_mask:          %08x (%d bits)\n", MASK(chr.greenShift, chr.greenSize), chr.greenSize);
+    PPC_DIAG_TRACE("\tblue_mask:           %08x (%d bits)\n", MASK(chr.blueShift, chr.blueSize), chr.blueSize);
+    PPC_DIAG_TRACE("\tdepth:               %d\n", chr.redSize + chr.greenSize + chr.blueSize);
 }
 
 SDLSystemDisplay::SDLSystemDisplay(const char *title, const DisplayCharacteristics &chr, int redraw_ms)

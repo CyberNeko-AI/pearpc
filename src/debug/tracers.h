@@ -27,6 +27,13 @@
 extern void ppc_fatal(const char *fmt, ...);
 
 
+// Diagnostic output is opt-in and independent of compiler debug symbols.
+#ifndef PEARPC_DEBUG_TRACE
+#define PEARPC_DEBUG_TRACE 0
+#endif
+
+#if PEARPC_DEBUG_TRACE
+#define PPC_DIAG_TRACE(...) fprintf(stderr, __VA_ARGS__)
 #define PPC_CPU_TRACE(msg...) ht_printf("[CPU/CPU] " msg)
 #define PPC_ALU_TRACE(msg...) ht_printf("[CPU/ALU] " msg)
 #define PPC_FPU_TRACE(msg...) ht_printf("[CPU/FPU] " msg)
@@ -49,6 +56,10 @@ extern void ppc_fatal(const char *fmt, ...);
 //#define IO_USB_TRACE(msg...) ht_printf("[IO/USB] " msg)
 #define IO_SERIAL_TRACE(msg...) ht_printf("[IO/SERIAL] " msg)
 #define IO_CORE_TRACE(msg...) ht_printf("[IO/Generic] " msg)
+
+#else
+#define PPC_DIAG_TRACE(...) do {} while (0)
+#endif
 
 #define PPC_CPU_WARN(msg...) ht_printf("[CPU/CPU] <Warning> " msg)
 #define PPC_ALU_WARN(msg...) ht_printf("[CPU/ALU] <Warning> " msg)

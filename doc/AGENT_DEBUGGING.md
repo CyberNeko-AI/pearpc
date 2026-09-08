@@ -8,15 +8,20 @@ This document describes the methodology for diagnosing problems in the aarch64 J
 
 ## Debug Outputs
 
+Normal builds disable trace output (`PEARPC_DEBUG_TRACE=0`); warnings and errors remain enabled.
+For the diagnostic trace messages, rebuild from the repository root with `make clean`, then
+`make -j4 CPPFLAGS="-DPEARPC_DEBUG_TRACE=1"`. Restore the defaults with `make clean`, then `make -j4`.
+This is independent of compiler debug symbols and does not enable per-instruction trace files.
+
 The emulator produces several debug outputs during a run:
 
 | File | Contents | When |
 |------|----------|------|
-| `jitc.log` | Every PPC instruction compiled + AArch64 codegen | Always (compile-time) |
-| `jitc_trace.log` | Every dispatch: PC, MSR, CR, LR, CTR, r0-r5, DEC | Always (runtime) |
-| `memdump_jit.bin` | Full 128MB RAM dump | On JIT exit |
-| `memdump_generic.bin` | Full 128MB RAM dump | On generic exit |
-| stderr | `[JITC] WARNING`, `[WATCH]`, `[DEC]`, dispatch stats | Always |
+| Configured `jitc_log_file` | PPC instructions compiled + AArch64 codegen | When the aarch64 JIT log filename is explicitly set; default is empty |
+| `jitc_trace.log` | Dispatch state | Disabled by default; requires explicitly enabling the diagnostic file trace in the source |
+| Configured `memdump_file` | Guest RAM dump | When configured; aarch64 exit/crash dump |
+| stdout/stderr | Warnings and errors | Always |
+| stdout/stderr | PROM, IDE/BMIDE, DEC/SPR, dispatch and display traces | Diagnostic build only |
 
 ## Step-by-Step Methodology
 

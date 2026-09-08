@@ -405,8 +405,8 @@ void prom_service_write(prom_args *pa)
 	uint32 addr = pa->args[1];
 	uint32 len = pa->args[2];
 	IO_PROM_TRACE("write(%08x, %08x, %08x)\n", ihandle, addr, len);
-	// Dump actual bytes being written
-	{
+	// Dump actual bytes only in diagnostic builds.
+    if (PEARPC_DEBUG_TRACE) {
 		byte buf[64];
 		uint32 dump_len = (len < 64) ? len : 64;
 		uint32 phys;

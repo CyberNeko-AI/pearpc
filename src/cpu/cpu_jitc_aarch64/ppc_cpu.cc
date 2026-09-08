@@ -110,11 +110,13 @@ void ppc_cpu_wakeup()
 
 static void decTimerCB(sys_timer t)
 {
+#if PEARPC_DEBUG_TRACE
     static int dc = 0;
     dc++;
     if (dc <= 10 || dc % 100 == 0) {
         fprintf(stderr, "[DEC] #%d\n", dc);
     }
+#endif
     ppc_cpu_atomic_raise_dec_exception(*gCPU);
 }
 
@@ -133,22 +135,22 @@ void ppc_cpu_run()
     {
         sigset_t set;
         pthread_sigmask(SIG_BLOCK, NULL, &set);
-        fprintf(stderr, "[INIT] SIGALRM blocked: %d\n", sigismember(&set, SIGALRM));
+        PPC_DIAG_TRACE("[INIT] SIGALRM blocked: %d\n", sigismember(&set, SIGALRM));
         if (sigismember(&set, SIGALRM)) {
             sigdelset(&set, SIGALRM);
             pthread_sigmask(SIG_SETMASK, &set, NULL);
-            fprintf(stderr, "[INIT] SIGALRM unblocked\n");
+            PPC_DIAG_TRACE("[INIT] SIGALRM unblocked\n");
         }
     }
     if ((sizeof *gCPU) % 16) {
         PPC_CPU_ERR("sizeof gCPU (%d) is not multiple of 16 (aarch64 alignment)\n", (int)(sizeof *gCPU));
     }
-    ht_printf("*** &gCPU: %p, &gJITC: %p\n", gCPU, gCPU->jitc);
-    ht_printf("sizeof cpu: %d\n", int(sizeof(*gCPU)));
+    PPC_DIAG_TRACE("*** &gCPU: %p, &gJITC: %p\n", gCPU, gCPU->jitc);
+    PPC_DIAG_TRACE("sizeof cpu: %d\n", int(sizeof(*gCPU)));
     PPC_CPU_TRACE("entering JIT at PC=0x%08x\n", gCPU->pc);
 
     ppc_start_jitc_asm(gCPU->pc, &gCPU, sizeof *gCPU);
-    ht_printf("JIT returned\n");
+    PPC_DIAG_TRACE("JIT returned\n");
 
     // Dump memory on exit if configured
     extern byte *gMemory;
@@ -346,7 +348,7 @@ bool ppc_cpu_init()
     }
     gTBreadITB = sys_get_hiresclk_ticks();
     gClientTimeBaseFrequency = q;
-    fprintf(stderr, "[INIT] gClientTimeBaseFrequency=%llu gHostClockScale=%d\n", gClientTimeBaseFrequency,
+    PPC_DIAG_TRACE("[INIT] gClientTimeBaseFrequency=%llu gHostClockScale=%d\n", gClientTimeBaseFrequency,
             gHostClockScale);
     gClientBusFrequency = gClientTimeBaseFrequency * 4;
     gClientClockFrequency = gClientBusFrequency * 5;

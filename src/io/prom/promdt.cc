@@ -1371,7 +1371,9 @@ void prom_init_device_tree()
 	macio->addProp(new PromPropInt("revision-id", 0));
 	macio->addProp(new PromPropInt("class-code", 0xff0000));
 	macio->addProp(new PromPropString("model", "AAPL,343S1211"));
-	macio->addProp(new PromPropMemory("compatible", "paddington\0heathrow", 19));
+    // Include the final NUL: Darwin compares every compatible entry with strlen().
+    const char macioCompatible[] = "paddington\0heathrow";
+    macio->addProp(new PromPropMemory("compatible", macioCompatible, sizeof macioCompatible));
 	byte reg4[] = {
 	//   bus   dev
 	0x00,0x01,0x28,0x00, 0x00,0x00,0x00,0x00, 0x00,0x00,0x00,0x00,

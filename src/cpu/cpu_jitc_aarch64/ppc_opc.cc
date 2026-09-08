@@ -88,9 +88,11 @@ void FASTCALL writeDEC(PPC_CPU_State &aCPU, uint32 newdec)
             PPC_OPC_WARN("write dec > 20 millisec := %08x (%qu)\n", aCPU.dec, q);
             q = 10 * 1000 * 1000;
         }
+#if PEARPC_DEBUG_TRACE
         static int stc = 0; stc++;
         if (stc <= 20)
             fprintf(stderr, "[TIMER] set_timer #%d: dec=%08x q=%llu ns (%.1f ms)\n", stc, aCPU.dec, q, q / 1e6);
+#endif
         sys_set_timer(gDECtimer, 0, q, false);
     }
     gDECwriteValue = aCPU.dec;

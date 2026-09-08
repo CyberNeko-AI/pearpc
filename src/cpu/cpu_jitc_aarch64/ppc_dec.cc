@@ -1197,7 +1197,7 @@ void ppc_dec_init()
 {
     ppc_opc_init_group2();
     if ((ppc_cpu_get_pvr(0) & 0xffff0000) == 0x000c0000) {
-        ht_printf("[PPC/VEC] AltiVec enabled\n");
+        PPC_DIAG_TRACE("[PPC/VEC] AltiVec enabled\n");
         ppc_opc_table_main[4] = ppc_opc_group_v;
         ppc_opc_table_gen_main[4] = ppc_opc_gen_group_v;
         ppc_opc_init_groupv();

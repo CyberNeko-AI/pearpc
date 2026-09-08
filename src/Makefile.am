@@ -25,6 +25,10 @@ system/osapi/@OSAPI_DIR@/libsosapi.a $(ppc_RES) @PPC_LDADD@
 
 ppc_LDFLAGS	= @PPC_LDFLAGS@
 
+# Reconfigure can select a CPU/UI archive older than the current executable.
+# Relink when the generated Makefile changes so the selected backend takes effect.
+EXTRA_ppc_DEPENDENCIES = Makefile
+
 ppc_SOURCES	= main.cc info.h ppc_img.c ppc_img.h \
 ppc_font.c ppc_font.h ppc_button_changecd.c ppc_button_changecd.h \
 configparser.cc configparser.h

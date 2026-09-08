@@ -1036,6 +1036,7 @@ static inline NativeAddress jitcGetEntrypoint(ClientPage *cp, uint32 ofs)
 
 extern JITC *gJITC;
 FILE *gTraceLog = NULL;
+#if PEARPC_DEBUG_TRACE
 static uint64 gTraceCount = 0;
 
 static void traceInit()
@@ -1047,6 +1048,8 @@ static void traceInit()
     //     if (gTraceLog) setvbuf(gTraceLog, NULL, _IOFBF, 256 * 1024);
     // }
 }
+
+#endif
 
 static NativeAddress jitcNewEntrypoint(JITC &jitc, ClientPage *cp, uint32 baseaddr, uint32 ofs)
 {
@@ -1156,11 +1159,14 @@ extern "C" NativeAddress jitcStartTranslation(JITC &jitc, ClientPage *cp, uint32
  *  1. Re-enable execute protection (W^X on macOS)
  *  2. Flush the instruction cache
  */
+#if PEARPC_DEBUG_TRACE
 static uint64 jitcHits = 0, jitcNewTranslations = 0, jitcNewEntries = 0;
+#endif
 
 extern "C" NativeAddress jitcNewPC(JITC &jitc, uint32 entry)
 {
     entry &= 0xfffffffc;
+#if PEARPC_DEBUG_TRACE
     traceInit();
     // Log EA→PA mapping for kernel-range addresses
     {
@@ -1225,6 +1231,7 @@ extern "C" NativeAddress jitcNewPC(JITC &jitc, uint32 entry)
             fflush(gTraceLog);
         }
     }
+#endif
     // Catch dispatch from PROM address range
     {
         extern PPC_CPU_State *gCPU;
@@ -1285,7 +1292,9 @@ extern "C" NativeAddress jitcNewPC(JITC &jitc, uint32 entry)
     NativeAddress result;
     if (!cp->tcf_current) {
         /* First translation for this page */
+#if PEARPC_DEBUG_TRACE
         jitcNewTranslations++;
+#endif
         result = jitcStartTranslation(jitc, cp, baseaddr, entry & 0xfff);
         // Flush icache for all fragments used by this page
         jitcFlushClientPage(cp);
@@ -1294,11 +1303,15 @@ extern "C" NativeAddress jitcNewPC(JITC &jitc, uint32 entry)
         NativeAddress ofs = jitcGetEntrypoint(cp, entry & 0xfff);
         if (ofs) {
             /* Cache hit — already translated, no flush needed */
+#if PEARPC_DEBUG_TRACE
             jitcHits++;
+#endif
             result = ofs;
         } else {
             /* New entrypoint on existing page */
+#if PEARPC_DEBUG_TRACE
             jitcNewEntries++;
+#endif
             pthread_jit_write_protect_np(0);
             result = jitcNewEntrypoint(jitc, cp, baseaddr, entry & 0xfff);
             jitcFlushClientPage(cp);
@@ -1470,7 +1483,7 @@ bool JITC::init(uint maxClientPages, uint32 tcSize)
     extern byte *gTranslationCacheBase;
     gTranslationCacheBase = translationCache;
 
-    ht_printf("translation cache: %p (aarch64 JIT)\n", translationCache);
+    PPC_DIAG_TRACE("translation cache: %p (aarch64 JIT)\n", translationCache);
 
     if (!translationCache) {
         return false;

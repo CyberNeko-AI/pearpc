@@ -872,7 +872,7 @@ bool FASTCALL ppc_init_physical_memory(uint size)
     if ((uint64)gMemory & 0x0fff) {
         gMemory += 4096 - ((uint64)gMemory & 0x0fff);
     }
-    printf("&gMemory: %p\n", gMemory);
+    PPC_DIAG_TRACE("&gMemory: %p\n", gMemory);
     if (gMemory == 0) {
         PPC_MMU_ERR("Cannot allocate memory!\n");
     }

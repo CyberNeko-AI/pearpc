@@ -1416,7 +1416,8 @@ public:
 static void read_partitions(Container &brs, bool only_bootable)
 {
 	brs.delAll();
-	const char *boot_devices[] = {"disk0", "disk1", "cdrom0", "cdrom1", NULL};
+    // Preserve CD-first auto boot; prom_env_bootpath selects a disk explicitly.
+    const char *boot_devices[] = {"cdrom0", "cdrom1", "disk0", "disk1", NULL};
 	const char **boot_device = boot_devices;
 	while (*boot_device) {
 		PromNode *node = findDevice(*boot_device, FIND_DEVICE_FIND, NULL);
@@ -1536,6 +1537,8 @@ bool prom_user_boot_partition(File *&ret_file, uint32 &size, bool &direct, uint3
 				continue;
 			}
 			gDisplay->printf("\nBooting %d: '%y:%d'...\n", choice+1, bootrec->devname, bootrec->partnum);
+            PPC_DIAG_TRACE("[PROM-BOOT] device=%s drive=%d partition=%d\n",
+                bootrec->devname->contentChar(), bootrec->d->mNumber, bootrec->partnum);
 			// FIXME: ic hack
 			IDEConfig *ic = ide_get_config(bootrec->d->mNumber);
 			File *rawFile = ic->device->promGetRawFile();

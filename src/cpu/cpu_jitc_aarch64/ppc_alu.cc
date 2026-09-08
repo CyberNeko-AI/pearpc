@@ -3341,7 +3341,7 @@ int ppc_opc_bclrx(PPC_CPU_State &aCPU)
         }
         aCPU.npc = BD;
         if (aCPU.lr & 3) {
-            fprintf(stderr, "[BCLRX-ALIGN] LR=%08x not aligned! pc=%08x npc=%08x\n", aCPU.lr, aCPU.pc, BD);
+            PPC_DIAG_TRACE("[BCLRX-ALIGN] LR=%08x not aligned! pc=%08x npc=%08x\n", aCPU.lr, aCPU.pc, BD);
         }
         if (BD >= 0xBF000000 && BD < 0xC0000000) {
             PPC_ALU_ERR("BCLRX PROM dispatch: npc=%08x lr=%08x pc=%08x msr=%08x\n", BD, aCPU.lr, aCPU.pc, aCPU.msr);
@@ -3569,11 +3569,13 @@ int ppc_opc_mfspr(PPC_CPU_State &aCPU)
         case 22: {
             readDEC(aCPU);
             aCPU.gpr[rD] = aCPU.dec;
+#if PEARPC_DEBUG_TRACE
             static int rc = 0;
             rc++;
             if (rc <= 100 || rc % 1000 == 0) {
                 fprintf(stderr, "[SPR] mfspr DEC #%d: dec=%08x pc=%08x\n", rc, aCPU.dec, aCPU.pc);
             }
+#endif
             return 0;
         }
         case 25: aCPU.gpr[rD] = aCPU.sdr1; return 0;
@@ -3871,11 +3873,13 @@ int ppc_opc_mtspr(PPC_CPU_State &aCPU)
             /*		case 18: aCPU.gpr[rD] = aCPU.dsisr; return 0;
 		case 19: aCPU.gpr[rD] = aCPU.dar; return 0;*/
         case 22: {
+#if PEARPC_DEBUG_TRACE
             static int wc = 0;
             wc++;
             if (wc <= 100 || wc % 1000 == 0) {
                 fprintf(stderr, "[SPR] mtspr DEC #%d: val=%08x pc=%08x\n", wc, aCPU.gpr[rS], aCPU.pc);
             }
+#endif
             writeDEC(aCPU, aCPU.gpr[rS]);
             return 0;
         }
