@@ -306,8 +306,8 @@ static bool doTryBootHFSPlus(File *aDevice, uint aDeviceBlocksize, FileOfs start
 	hfsplus_devicehandle_s dh;
 	dh.mDevice = aDevice;
 	dh.mStart = 0;
+	IO_PROM_FS_TRACE("tryBootHFSPlus start: %qd\n", start);
 	volume vol;
-	ht_printf("start: %qd\n", start);
 	if (volume_open(&vol, &dh, partEnt->mPartNum-1, HFSP_MODE_RDONLY) == 0) {
 		volume_close(&vol);
 		HFSPlusInstantiateBootFilePrivData *priv = (HFSPlusInstantiateBootFilePrivData*)
@@ -318,7 +318,11 @@ static bool doTryBootHFSPlus(File *aDevice, uint aDeviceBlocksize, FileOfs start
 		partEnt->mInstantiateFileSystem = HFSPlusInstantiateFileSystem;
 		partEnt->mBootMethod = BM_chrp;
 		return true;
-	} else IO_PROM_FS_TRACE("couldn't mount HFS+ partition.\n");
+	} else {
+		if (partEnt->mType && strcmp(partEnt->mType, "Apple_HFS") == 0) {
+			IO_PROM_FS_TRACE("couldn't mount HFS+ partition.\n");
+		}
+	}
 	return false;
 }
 

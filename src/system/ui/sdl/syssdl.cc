@@ -105,6 +105,10 @@ static bool handleSDLEvent(const SDL_Event &event)
 		return true;
 	}
 	case SDL_EVENT_KEY_DOWN: {
+		// SDL also reports generated auto-repeat key-down events.  ADB
+		// already provides key repeat semantics to the guest, so forwarding
+		// these events duplicates characters in console applications.
+		if (event.key.repeat) return true;
 		int sc = event.key.scancode;
 		if (sc < 0 || sc >= (int)sizeof(scancode_to_adb_key)) break;
 		ev.key.keycode = scancode_to_adb_key[sc];

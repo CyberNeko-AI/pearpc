@@ -74,6 +74,7 @@ public:
 
 	virtual	bool			addNode(PromNode *node);
 	virtual	bool			addProp(PromProp *node);
+	virtual	bool			setProp(PromProp *node);
 	virtual	bool			addNodeShort(const char *name, const char *nodename);
 	virtual PromNode *		findNode(const char *name);
 	virtual PromProp *		findProp(const char *name);

@@ -1416,7 +1416,7 @@ public:
 static void read_partitions(Container &brs, bool only_bootable)
 {
 	brs.delAll();
-	const char *boot_devices[] = {"cdrom0", "cdrom1", "disk0", "disk1", NULL};
+	const char *boot_devices[] = {"disk0", "disk1", "cdrom0", "cdrom1", NULL};
 	const char **boot_device = boot_devices;
 	while (*boot_device) {
 		PromNode *node = findDevice(*boot_device, FIND_DEVICE_FIND, NULL);
@@ -1493,6 +1493,33 @@ bool prom_user_boot_partition(File *&ret_file, uint32 &size, bool &direct, uint3
 			}
 		} else {
 			choice = 1;
+			if (gPromBootPath.length() > 0) {
+				for (uint i = 0; i < brs.count(); i++) {
+					BootRec *bootrec = dynamic_cast<BootRec *>(brs[i]);
+					if (bootrec) {
+						char part_buf[64];
+						ht_snprintf(part_buf, sizeof(part_buf), "%s:%d", bootrec->devname->contentChar(), bootrec->partnum);
+						char alias_buf[64];
+						alias_buf[0] = '\0';
+						if (strncmp(bootrec->devname->contentChar(), "disk", 4) == 0) {
+							ht_snprintf(alias_buf, sizeof(alias_buf), "hd:%d", bootrec->partnum);
+						} else if (strncmp(bootrec->devname->contentChar(), "cdrom", 5) == 0) {
+							ht_snprintf(alias_buf, sizeof(alias_buf), "cd:%d", bootrec->partnum);
+						}
+						char full_path[1024];
+						bootrec->d->toPath(full_path, sizeof(full_path));
+						if (gPromBootPath == *bootrec->devname ||
+						    gPromBootPath == part_buf ||
+						    (alias_buf[0] && gPromBootPath == alias_buf) ||
+						    (gPromBootPath == "hd" && strncmp(bootrec->devname->contentChar(), "disk", 4) == 0) ||
+						    (gPromBootPath == "cd" && strncmp(bootrec->devname->contentChar(), "cdrom", 5) == 0) ||
+						    strstr(full_path, gPromBootPath.contentChar()) != NULL) {
+							choice = i + 1;
+							break;
+						}
+					}
+				}
+			}
 		}
 		if (choice == 0) {
 			gDisplay->printf("\n\n");
@@ -1545,7 +1572,7 @@ bool prom_user_boot_partition(File *&ret_file, uint32 &size, bool &direct, uint3
 //			ht_snprintf(bootpath, sizeof bootpath, "/pci/pci-bridge/pci-ata/ata-4/disk1@1:9,BootX");
 			PromNode *chosen = findDevice("/chosen", FIND_DEVICE_FIND, NULL);
 			if (chosen) {
-				chosen->addProp(new PromPropString("bootpath", bootpath));
+				chosen->setProp(new PromPropString("bootpath", bootpath));
 			}
 
 			ret_file = bootFile;

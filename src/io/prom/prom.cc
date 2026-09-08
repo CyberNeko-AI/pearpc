@@ -59,7 +59,7 @@ void prom_init()
 	if (gConfig->haveKey(PROM_KEY_ENV_BOOTPATH)) {
 		String bootpath;
 		gConfig->getConfigString(PROM_KEY_ENV_BOOTPATH, bootpath);
-		chosen->addProp(new PromPropString("bootpath", bootpath.contentChar()));
+		chosen->setProp(new PromPropString("bootpath", bootpath.contentChar()));
 		gPromBootPath.assign(bootpath);
 	}
 	String bootargs;

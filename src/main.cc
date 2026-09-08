@@ -261,6 +261,23 @@ static void crash_handler(int sig, siginfo_t *info, void *ctx)
     ppc_cpu_crash_dump(128 + sig);
 }
 
+static void sigusr1_handler(int sig)
+{
+    extern byte *gFrameBuffer;
+    extern char gFramebufferDumpFile[];
+    extern SystemDisplay *gDisplay;
+    const char *dump_path = gFramebufferDumpFile[0] ? gFramebufferDumpFile : "fb_boot.bin";
+    if (gFrameBuffer && gDisplay) {
+        uint32 fbSize = gDisplay->mClientChar.width * gDisplay->mClientChar.height * gDisplay->mClientChar.bytesPerPixel;
+        FILE *df = fopen(dump_path, "wb");
+        if (df) {
+            fwrite(gFrameBuffer, 1, fbSize, df);
+            fclose(df);
+            fprintf(stderr, "[DUMP] SIGUSR1: wrote %s (%u bytes)\n", dump_path, fbSize);
+        }
+    }
+}
+
 int main(int argc, char *argv[])
 {
     // Install signal handlers for crash diagnostics
@@ -273,6 +290,7 @@ int main(int argc, char *argv[])
     sigaction(SIGBUS, &sa, NULL);
     sigaction(SIGTERM, &sa, NULL);
     sigaction(SIGINT, &sa, NULL);
+    signal(SIGUSR1, sigusr1_handler);
 
     const char *configfile = NULL;
     bool showHelp = false;

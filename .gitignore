@@ -21,11 +21,23 @@ bootfile.dump
 test/*.o
 test/nvram_test
 test/nvram_mandrake
+test/jitc_test
+test/test_semantics
+test/test_ide_io
 nvram
 
-# JIT debug/trace logs
-jitc.log
-jitc_trace.log
+# Configurations (local VM configurations, keep ppccfg.example)
+ppccfg.*
+!ppccfg.example
+
+# Debug dumps, framebuffers, screen captures
+*.bin
+*.raw
+*.png
+scripts/debug/auto_capture.py
+
+# Logs
+*.log
 
 # Large binary files
 *.iso
