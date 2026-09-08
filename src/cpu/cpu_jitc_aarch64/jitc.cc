@@ -1050,6 +1050,7 @@ static void traceInit()
 
 static NativeAddress jitcNewEntrypoint(JITC &jitc, ClientPage *cp, uint32 baseaddr, uint32 ofs)
 {
+    ofs &= 0xffc;
     jitcDebugLogAdd("=== jitcNewEntrypoint: %08x Beginning jitc ===\n", baseaddr + ofs);
     if (gTraceLog) {
         fprintf(gTraceLog, "TRANSLATE %08x\n", baseaddr + ofs);
@@ -1159,6 +1160,7 @@ static uint64 jitcHits = 0, jitcNewTranslations = 0, jitcNewEntries = 0;
 
 extern "C" NativeAddress jitcNewPC(JITC &jitc, uint32 entry)
 {
+    entry &= 0xfffffffc;
     traceInit();
     // Log EA→PA mapping for kernel-range addresses
     {

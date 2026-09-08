@@ -686,6 +686,7 @@ JITCFlow ppc_opc_gen_bclrx(JITC &jitc)
         jitc.clobberAll();
         // Must read old LR before overwriting
         jitc.asmLDRw_cpu(W0, offsetof(PPC_CPU_State, lr));
+        jitc.asmANDw_val(W0, W0, 0xFFFFFFFC);
         if (lk) {
             // blrl: new LR = ccb + pc + 4, then jump to old LR
             jitc.asmLDRw_cpu(W16, offsetof(PPC_CPU_State, current_code_base));
@@ -759,6 +760,7 @@ JITCFlow ppc_opc_gen_bcctrx(JITC &jitc)
             jitc.asmSTRw_cpu(W16, offsetof(PPC_CPU_State, lr));
         }
         jitc.asmLDRw_cpu(W0, offsetof(PPC_CPU_State, ctr));
+        jitc.asmANDw_val(W0, W0, 0xFFFFFFFC);
         jitc.asmCALL_cpu(PPC_STUB_NEW_PC);
         return flowEndBlockUnreachable;
     }

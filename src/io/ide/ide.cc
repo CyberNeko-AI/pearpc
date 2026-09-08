@@ -1113,52 +1113,109 @@ void receive_atapi_packet()
 
 		bool write_to_mem = bmide_command & BM_IDE_CR_WRITE;
 		bool write_to_device = !write_to_mem;
+		int sec_size = gIDEState.state[gIDEState.drive].current_sector_size;
+		if (sec_size <= 0) sec_size = 512;
+
+		const bool use_count = (count != 0);
+
 		while (true) {
-			int to_transfer = gIDEState.state[gIDEState.drive].current_sector_size;
-			int transfer_at_once = to_transfer;
-			if (transfer_at_once > pr_left) transfer_at_once = pr_left;
-			do {
-				uint8 buffer[transfer_at_once];
-				if (write_to_device) {
-					ppc_dma_read(buffer, prd.addr, transfer_at_once);
-					if (gIDEState.config[gIDEState.drive].device->write(buffer, transfer_at_once) != transfer_at_once) {
-						gIDEState.config[gIDEState.drive].device->release();
-						IO_IDE_WARN("write failed!\n");
-						return false;
+			uint remaining_sectors = use_count ? count : (gIDEState.state[gIDEState.drive].sector_count ? gIDEState.state[gIDEState.drive].sector_count : 256);
+			uint max_sectors = (uint)pr_left / sec_size;
+
+			if (max_sectors > 0) {
+				// Fast path: batch PRD-level transfer (up to 64 KiB at once)
+				uint sectors_to_transfer = (remaining_sectors < max_sectors) ? remaining_sectors : max_sectors;
+				int bytes_to_transfer = sectors_to_transfer * sec_size;
+
+				byte *guest_mem = ppc_dma_get_ptr(prd.addr, bytes_to_transfer);
+				if (guest_mem) {
+					if (write_to_device) {
+						if (gIDEState.config[gIDEState.drive].device->write(guest_mem, bytes_to_transfer) != bytes_to_transfer) {
+							gIDEState.config[gIDEState.drive].device->release();
+							IO_IDE_WARN("write failed!\n");
+							return false;
+						}
+					} else {
+						if (gIDEState.config[gIDEState.drive].device->read(guest_mem, bytes_to_transfer) != bytes_to_transfer) {
+							gIDEState.config[gIDEState.drive].device->release();
+							IO_IDE_WARN("read failed!\n");
+							return false;
+						}
 					}
 				} else {
-					if (gIDEState.config[gIDEState.drive].device->read(buffer, transfer_at_once) != transfer_at_once) {
+					// Fallback if guest physical address is outside normal memory bounds
+					int buf_size = (bytes_to_transfer > 65536) ? 65536 : bytes_to_transfer;
+					uint8 *buffer = (uint8 *)malloc(buf_size);
+					if (!buffer) {
 						gIDEState.config[gIDEState.drive].device->release();
-						IO_IDE_WARN("read failed!\n");
 						return false;
 					}
-					ppc_dma_write(prd.addr, buffer, transfer_at_once);
-				}
-				pr_left -= transfer_at_once;
-				prd.addr += transfer_at_once;
-				to_transfer -= transfer_at_once;
-				if (pr_left < 0) {
-					gIDEState.config[gIDEState.drive].device->release();
-					IO_IDE_WARN("pr_left became negative!\n");
-					return false;
-				}
-				if (!pr_left) {
-        				if (prd.size & 0x80000000) {
-						// no more prd's, but still something to transfer -> error
-						bool ready;
-						if (count) {
-							ready = false;
+					int offset = 0;
+					while (offset < bytes_to_transfer) {
+						int chunk = bytes_to_transfer - offset;
+						if (chunk > buf_size) chunk = buf_size;
+						if (write_to_device) {
+							ppc_dma_read(buffer, prd.addr + offset, chunk);
+							if (gIDEState.config[gIDEState.drive].device->write(buffer, chunk) != chunk) {
+								free(buffer);
+								gIDEState.config[gIDEState.drive].device->release();
+								return false;
+							}
 						} else {
-							ready = gIDEState.state[gIDEState.drive].sector_count > 1;
+							if (gIDEState.config[gIDEState.drive].device->read(buffer, chunk) != chunk) {
+								free(buffer);
+								gIDEState.config[gIDEState.drive].device->release();
+								return false;
+							}
+							ppc_dma_write(prd.addr + offset, buffer, chunk);
 						}
-						if (to_transfer || ready) {
+						offset += chunk;
+					}
+					free(buffer);
+				}
+
+				pr_left -= bytes_to_transfer;
+				prd.addr += bytes_to_transfer;
+
+				if (use_count) {
+					count -= sectors_to_transfer;
+				} else {
+					if (gIDEState.config[gIDEState.drive].lba) {
+						uint32 cur = makeLogical(gIDEState.state[gIDEState.drive].head, 
+							gIDEState.state[gIDEState.drive].cyl, 
+							gIDEState.state[gIDEState.drive].sector_no);
+						cur += sectors_to_transfer;
+						gIDEState.state[gIDEState.drive].head      = (cur>>24) & 0xf;
+						gIDEState.state[gIDEState.drive].cyl       = cur>>8;
+						gIDEState.state[gIDEState.drive].sector_no = cur & 0xff;
+					} else {
+						for (uint s = 0; s < sectors_to_transfer; s++) {
+							gIDEState.state[gIDEState.drive].sector_no++;
+							if (gIDEState.state[gIDEState.drive].sector_no > gIDEState.config[gIDEState.drive].hd.spt) {
+								gIDEState.state[gIDEState.drive].sector_no = 1;
+								gIDEState.state[gIDEState.drive].head++;
+								if (gIDEState.state[gIDEState.drive].head >= gIDEState.config[gIDEState.drive].hd.heads) {
+									gIDEState.state[gIDEState.drive].head = 0;
+									gIDEState.state[gIDEState.drive].cyl++;
+								}
+							}
+						}
+					}
+					gIDEState.state[gIDEState.drive].sector_count -= sectors_to_transfer;
+				}
+
+				bool ready = use_count ? (count == 0) : (gIDEState.state[gIDEState.drive].sector_count == 0);
+
+				if (!pr_left) {
+					if (prd.size & 0x80000000) {
+						if (!ready) {
 							gIDEState.config[gIDEState.drive].device->release();
 							IO_IDE_WARN("no more prd's, but still something to transfer\n");
 							return false;
 						}
 						prd_exhausted = true;
+						break;
 					} else {
-						// get next prd
 						prd_addr += 8;
 						if (!ppc_dma_read(&prd, prd_addr, 8)) {
 							gIDEState.config[gIDEState.drive].device->release();
@@ -1168,17 +1225,71 @@ void receive_atapi_packet()
 						prd.size = ppc_word_from_LE(prd.size);
 						pr_left = prd.size & 0xffff;
 						if (!pr_left) pr_left = 64*1024;
-						transfer_at_once = to_transfer;
-						if (transfer_at_once > pr_left) transfer_at_once = pr_left;
 					}
 				}
-			} while (to_transfer);
-			if (count) {
-				count--;
-				if (!count) break;
+
+				if (ready) break;
 			} else {
-				incAddress();
-				if (!gIDEState.state[gIDEState.drive].sector_count) break;
+				// Sub-sector fallback path (rare case where pr_left < sector size)
+				int to_transfer = sec_size;
+				int transfer_at_once = to_transfer;
+				if (transfer_at_once > pr_left) transfer_at_once = pr_left;
+				do {
+					uint8 buffer[transfer_at_once];
+					if (write_to_device) {
+						ppc_dma_read(buffer, prd.addr, transfer_at_once);
+						if (gIDEState.config[gIDEState.drive].device->write(buffer, transfer_at_once) != transfer_at_once) {
+							gIDEState.config[gIDEState.drive].device->release();
+							IO_IDE_WARN("write failed!\n");
+							return false;
+						}
+					} else {
+						if (gIDEState.config[gIDEState.drive].device->read(buffer, transfer_at_once) != transfer_at_once) {
+							gIDEState.config[gIDEState.drive].device->release();
+							IO_IDE_WARN("read failed!\n");
+							return false;
+						}
+						ppc_dma_write(prd.addr, buffer, transfer_at_once);
+					}
+					pr_left -= transfer_at_once;
+					prd.addr += transfer_at_once;
+					to_transfer -= transfer_at_once;
+					if (pr_left < 0) {
+						gIDEState.config[gIDEState.drive].device->release();
+						IO_IDE_WARN("pr_left became negative!\n");
+						return false;
+					}
+					if (!pr_left) {
+						if (prd.size & 0x80000000) {
+							bool more = (to_transfer > 0) || (use_count ? (count > 1) : (gIDEState.state[gIDEState.drive].sector_count > 1));
+							if (more) {
+								gIDEState.config[gIDEState.drive].device->release();
+								IO_IDE_WARN("no more prd's, but still something to transfer\n");
+								return false;
+							}
+							prd_exhausted = true;
+						} else {
+							prd_addr += 8;
+							if (!ppc_dma_read(&prd, prd_addr, 8)) {
+								gIDEState.config[gIDEState.drive].device->release();
+								return false;
+							}
+							prd.addr = ppc_word_from_LE(prd.addr);
+							prd.size = ppc_word_from_LE(prd.size);
+							pr_left = prd.size & 0xffff;
+							if (!pr_left) pr_left = 64*1024;
+							transfer_at_once = to_transfer;
+							if (transfer_at_once > pr_left) transfer_at_once = pr_left;
+						}
+					}
+				} while (to_transfer);
+				if (use_count) {
+					count--;
+					if (!count) break;
+				} else {
+					incAddress();
+					if (!gIDEState.state[gIDEState.drive].sector_count) break;
+				}
 			}
 		}
 		gIDEState.config[gIDEState.drive].device->release();
