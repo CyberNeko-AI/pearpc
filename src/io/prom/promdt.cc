@@ -196,6 +196,16 @@ bool PromNode::addProp(PromProp *node)
 	}
 }
 
+bool PromNode::setProp(PromProp *node)
+{
+	PromProp empty(node->name);
+	ObjHandle oh = props->find(&empty);
+	if (oh != InvObjHandle) {
+		props->del(oh);
+	}
+	return addProp(node);
+}
+
 bool PromNode::addNodeShort(const char *name, const char *node)
 {
 	KeyValue *kv = new KeyValue(new String(name), new String(node));
@@ -397,9 +407,10 @@ void PromInstanceATY::callMethod(const char *method, prom_args *pa)
 		for (uint iy = 0; iy < height; iy++) {
 			for (uint ix = 0; ix < width; ix++) {
 				uint32 phys;
-				ppc_prom_effective_to_physical(phys, data);
-				byte v[4];
-				ppc_dma_read(v, phys, bpp);
+				byte v[4] = {0, 0, 0, 0};
+				if (ppc_prom_effective_to_physical(phys, data)) {
+					ppc_dma_read(v, phys, bpp);
+				}
 				for (uint i=0; i<bpp; i++) *(f++) = v[i];
 /*				switch (bpp) {
 				case 1: {
@@ -1062,7 +1073,11 @@ PromNode *findDevice(const char *aPathName, int type, PromInstanceHandle *ret)
 		pathname = tmp;
 		component.leftSplit(':', nodeaddr, arguments);
 		nodeaddr.leftSplit('@', nodename, unitaddr);
-		pn = pn->findNode(nodename.contentChar());
+		if (nodename == (String)"" && unitaddr != (String)"") {
+			pn = pn->findNode((String("disk@") + unitaddr).contentChar());
+		} else {
+			pn = pn->findNode(nodename.contentChar());
+		}
 		if (!pn) return NULL;		
 	}
 	if (type == FIND_DEVICE_OPEN) {
@@ -1332,6 +1347,7 @@ void prom_init_device_tree()
 			ata4->addNode(disk1);
 			ata4->addNodeShort("disk", "disk0@0");
 			ata4->addNodeShort("disk0", "disk0@0");
+			ata4->addNodeShort("disk@0", "disk0@0");
 			disk1->addProp(new PromPropInt("device-id", 0));
 			disk1->addProp(new PromPropInt("reg", 0));
 			disk1->addProp(new PromPropString("device_type", "block"));
@@ -1341,6 +1357,8 @@ void prom_init_device_tree()
 			PromNode *disk2 = new PromNodeDisk("disk1@1", 1);
 			ata4->addNode(disk2);
 			ata4->addNodeShort("disk1", "disk1@1");
+			ata4->addNodeShort("disk@1", "disk1@1");
+			ata4->addNodeShort("cdrom@1", "disk1@1");
 			disk2->addProp(new PromPropInt("device-id", 1));
 			disk2->addProp(new PromPropInt("reg", 1));
 			disk2->addProp(new PromPropString("device_type", "block"));
