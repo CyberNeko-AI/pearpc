@@ -28,6 +28,7 @@
 #include "tools/endianess.h"
 
 #include "debug/ppcdis.h"
+#include "debug/tracers.h"
 #include "tools/snprintf.h"
 #include "jitc.h"
 #include "jitc_asm.h"
@@ -1233,6 +1234,7 @@ void jitcDebugLogAdd(const char *fmt, ...)
 
 void jitcDebugLogNewInstruction(JITC &jitc)
 {
+    if (!gDebugLog) return;
     char str[128];
     disasmPPC(jitc.current_opc, jitc.pc, str);
     jitcDebugLogAdd("%08x   %08x  %s\n", jitc.pc, jitc.current_opc, str);
@@ -1242,6 +1244,7 @@ void jitcDebugLogNewInstruction(JITC &jitc)
 
 void jitcDebugLogEmit(JITC &jitc, const byte *insn, int size)
 {
+    if (!gDebugLog) return;
     for (int ofs = 0; ofs < size; ofs += 4) {
         uint32 word = *(uint32 *)(insn + ofs);
         char disasm[256];
@@ -1575,7 +1578,7 @@ static void jitcDebugSelfTest()
     if (failures) {
         fprintf(stderr, "[DISASM] %d self-test(s) FAILED\n", failures);
     } else {
-        fprintf(stderr, "[DISASM] All self-tests passed\n");
+        PPC_DIAG_TRACE("[DISASM] All self-tests passed\n");
     }
 }
 
