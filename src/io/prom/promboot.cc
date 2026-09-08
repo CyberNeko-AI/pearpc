@@ -1527,6 +1527,20 @@ bool prom_user_boot_partition(File *&ret_file, uint32 &size, bool &direct, uint3
 			char bootpath[1024];
 			char devicebootpath[1024];
 			bootrec->d->toPath(devicebootpath, sizeof devicebootpath);
+			/*
+			 * Open Firmware names the ATA nodes diskN@N, while the
+			 * I/O Registry path used by Darwin drops the diskN prefix
+			 * (for example .../ata-4/@0).  BootX copies this property
+			 * into its root-matching request, so expose the registry form
+			 * here without changing the PROM path used to load BootX.
+			 */
+			char *leaf = strrchr(devicebootpath, '/');
+			char *unit = leaf ? strchr(leaf, '@') : NULL;
+			if (leaf && unit) {
+				memmove(leaf + 1, unit, strlen(unit) + 1);
+			}
+			IO_PROM_TRACE("kernel bootpath: %s:%d,BootX (PROM path retained separately)\n",
+				devicebootpath, bootrec->partnum);
 			ht_snprintf(bootpath, sizeof bootpath, "%s:%d,BootX", devicebootpath, bootrec->partnum);
 //			ht_snprintf(bootpath, sizeof bootpath, "/pci/pci-bridge/pci-ata/ata-4/disk1@1:9,BootX");
 			PromNode *chosen = findDevice("/chosen", FIND_DEVICE_FIND, NULL);

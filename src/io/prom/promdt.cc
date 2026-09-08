@@ -438,7 +438,7 @@ void PromInstanceATY::callMethod(const char *method, prom_args *pa)
 		uint32 width = pa->args[3];
 		uint32 height = pa->args[2];
 		uint32 bpp = gDisplay->mClientChar.bytesPerPixel;
-		uint32 f = y*(gDisplay->mClientChar.width + x)*bpp;
+		uint32 f = (y*gDisplay->mClientChar.width + x)*bpp;
 		for (uint iy=0; iy < height; iy++) {
 			for (uint ix=0; ix < width; ix++) {
 				if (bpp > 2) {
