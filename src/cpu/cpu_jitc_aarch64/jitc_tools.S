@@ -102,6 +102,9 @@ do_export EXTERN(ppc_start_jitc_asm)
 //
 .p2align 4
 do_export EXTERN(ppc_new_pc_asm)
+    // Enforce 4-byte instruction alignment (PowerPC ignores bits 30-31 for instruction fetch)
+    and     w0, w0, #0xFFFFFFFC
+
     // Update current_code_base
     and     w1, w0, #0xFFFFF000
     str     w1, [x20, #current_code_base]
@@ -111,6 +114,7 @@ do_export EXTERN(ppc_new_pc_asm)
     ldar    w2, [x1]
     cbnz    w2, .Lnewpc_exception
 
+.Lnewpc_continue:
     // Store effective PC (needed for exception handling — SRR0)
     str     w0, [x20, #pc]
     mov     w21, w0
@@ -144,7 +148,28 @@ do_export EXTERN(ppc_new_pc_asm)
     br      x5
 
 .Lnewpc_exception:
-    b       EXTERN(ppc_heartbeat_ext_asm)
+    // Check stop_exception
+    ldrb    w2, [x20, #stop_exception]
+    tst     w2, #1
+    b.ne    ppc_stop_jitc_asm
+
+    // Check MSR_EE (bit 15 of msr => (1 << 15))
+    ldr     w3, [x20, #msr]
+    tst     w3, #(1 << 15)
+    b.eq    .Lnewpc_continue
+
+    // Interrupts enabled: check ext_exception first
+    ldrb    w2, [x20, #ext_exception]
+    tst     w2, #1
+    b.ne    EXTERN(ppc_ext_exception_asm)
+
+    // Check dec_exception
+    ldrb    w2, [x20, #dec_exception]
+    tst     w2, #1
+    b.ne    EXTERN(ppc_dec_exception_asm)
+
+    // Spurious / already cleared: continue dispatch
+    b       .Lnewpc_continue
 
 .Lnewpc_tlb_miss:
     mov     w1, #0
@@ -205,10 +230,7 @@ do_export EXTERN(ppc_new_pc_rel_asm)
 .p2align 4
 do_export EXTERN(ppc_new_pc_this_page_asm)
     // IN: w0 = pc offset within current page (0..4092)
-    //
-    // Fast same-page dispatch: translate EA to PA, look up the entrypoint
-    // directly from the ClientPage array, and jump to it.
-    // Falls back to jitcNewPC if entrypoint not found.
+    and     w0, w0, #0xFFC
 
     // Save offset for later
     mov     w21, w0

@@ -1050,6 +1050,7 @@ static void traceInit()
 
 static NativeAddress jitcNewEntrypoint(JITC &jitc, ClientPage *cp, uint32 baseaddr, uint32 ofs)
 {
+    ofs &= 0xffc;
     jitcDebugLogAdd("=== jitcNewEntrypoint: %08x Beginning jitc ===\n", baseaddr + ofs);
     if (gTraceLog) {
         fprintf(gTraceLog, "TRANSLATE %08x\n", baseaddr + ofs);
@@ -1085,8 +1086,11 @@ static NativeAddress jitcNewEntrypoint(JITC &jitc, ClientPage *cp, uint32 basead
     jitcDebugLogAdd("--- page CFG: %d blocks from %08x ---\n", cfg.numBlocks, baseaddr + ofs);
 
     while (1) {
-        if (cfg.blockAtOfs[ofs / 4] >= 0 && !cp->entrypoints[ofs >> 2]) {
-            jitcCreateEntrypoint(cp, ofs);
+        if (cfg.blockAtOfs[ofs / 4] >= 0) {
+            jitc.clobberAll();
+            if (!cp->entrypoints[ofs >> 2]) {
+                jitcCreateEntrypoint(cp, ofs);
+            }
         }
         jitc.current_opc = ppc_word_from_BE(*(uint32 *)&physpage[ofs]);
         jitcDebugLogNewInstruction(jitc);
@@ -1156,6 +1160,7 @@ static uint64 jitcHits = 0, jitcNewTranslations = 0, jitcNewEntries = 0;
 
 extern "C" NativeAddress jitcNewPC(JITC &jitc, uint32 entry)
 {
+    entry &= 0xfffffffc;
     traceInit();
 #if PEARPC_DEBUG_TRACE
     // Log EA→PA mapping for kernel-range addresses

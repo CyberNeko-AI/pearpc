@@ -1416,8 +1416,8 @@ public:
 static void read_partitions(Container &brs, bool only_bootable)
 {
 	brs.delAll();
-    // Preserve CD-first auto boot; prom_env_bootpath selects a disk explicitly.
-    const char *boot_devices[] = {"cdrom0", "cdrom1", "disk0", "disk1", NULL};
+    // Prefer disks for auto boot; fall back to optical media when no disk is usable.
+    const char *boot_devices[] = {"disk0", "disk1", "cdrom0", "cdrom1", NULL};
 	const char **boot_device = boot_devices;
 	while (*boot_device) {
 		PromNode *node = findDevice(*boot_device, FIND_DEVICE_FIND, NULL);
