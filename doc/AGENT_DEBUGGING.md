@@ -285,6 +285,23 @@ If the above steps don't reveal the issue, add tracing to the C code:
 
 ### scripts/debug/memdump.py (primary tool)
 
+### Capture an intermittent crash
+
+Run the emulator through the capture wrapper so every run gets its own directory:
+
+```sh
+scripts/debug/run_with_crash_capture.sh ppccfg.osx
+```
+
+The directory under `crash-captures/` contains `console.log`, the input
+configuration, and (when the process reaches the CPU loop) `guest-memory.bin`
+and `framebuffer.bin`. Native signals and `ppc_fatal` already print host
+registers, PPC state, and a native backtrace into `console.log`; the memory
+dump can be inspected with `scripts/debug/memdump.py` and the other tools below.
+For a large RAM configuration, set `PEARPC_CRASH_DIR` to another disk before
+running. Do not enable verbose trace categories until a reproducible capture
+is available, because they can change timing and performance.
+
 ```sh
 python3 scripts/debug/memdump.py printk memdump_jit.bin [search-term]
 python3 scripts/debug/memdump.py oops memdump_jit.bin

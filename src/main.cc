@@ -651,13 +651,8 @@ int main(int argc, char *argv[])
 
         testforth();
 
-        PPC_DIAG_TRACE("[DBG] prom_load_boot_file...\n");
-        if (!prom_load_boot_file()) {
-            ht_printf("cannot find boot file.\n");
-            return 1;
-        }
-
-        // Stash dump paths before deleting config
+        // Stash dump paths before boot so a failure during PROM or kernel
+        // loading can still write the configured guest-memory snapshot.
         String tmp;
         gConfig->getConfigString("memdump_file", tmp);
         strncpy(gMemdumpFile, tmp.contentChar(), sizeof(gMemdumpFile) - 1);
@@ -665,6 +660,12 @@ int main(int argc, char *argv[])
         strncpy(gFramebufferDumpFile, tmp.contentChar(), sizeof(gFramebufferDumpFile) - 1);
         gConfig->getConfigString("jitc_log_file", tmp);
         strncpy(gJitcLogFile, tmp.contentChar(), sizeof(gJitcLogFile) - 1);
+
+        PPC_DIAG_TRACE("[DBG] prom_load_boot_file...\n");
+        if (!prom_load_boot_file()) {
+            ht_printf("cannot find boot file.\n");
+            return 1;
+        }
 
         // this was your last chance to visit the config..
         delete gConfig;
