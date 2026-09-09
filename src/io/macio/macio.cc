@@ -20,6 +20,7 @@
 
 #include "debug/tracers.h"
 #include "macio.h"
+#include "configparser.h"
 
 #define MACIO_DBDMA_ADDRESS_CONTROL	0x00
 #define MACIO_DBDMA_ADDRESS_STATUS	0x04
@@ -107,8 +108,17 @@ struct MacIO_DBDMA_ChannelRegs {
 };
  
 PCI_MacIO::PCI_MacIO()
-	:PCI_Device("pci-macio", 0x01, 0x05)
+    : PCI_Device("pci-macio", 0x01, 0x05), sccLog(NULL)
 {
+    String logPath;
+    gConfig->getConfigString("macio_scc_log", logPath);
+    if (logPath.length()) {
+        sccLog = logPath == "-" ? stderr : fopen(logPath.contentChar(), "wb");
+        if (!sccLog) {
+            IO_MACIO_ERR("can't open SCC log '%s'\n", logPath.contentChar());
+        }
+        scc.setOutput(sccLog);
+    }
 	mIORegSize[0] = 0x80000;
 	mIORegType[0] = PCI_ADDRESS_SPACE_MEM;
 
@@ -132,8 +142,18 @@ PCI_MacIO::PCI_MacIO()
 	mConfig[0x3f] = 0;	
 }
 
+PCI_MacIO::~PCI_MacIO()
+{
+    if (sccLog && sccLog != stderr) {
+        fclose(sccLog);
+    }
+}
+
 bool PCI_MacIO::readDeviceMem(uint r, uint32 address, uint32 &data, uint size)
 {
+    if (r == 0 && address >= 0x12000 && address < 0x12008) {
+        return scc.read(address - 0x12000, data, size);
+    }
 	if (r==0 && address >= 0x8000 && address < 0x8100) {
 		address -= 0x8000;
 		IO_MACIO_TRACE("dbdma: read(%d) @%08x\n", size, address);
@@ -169,6 +189,9 @@ bool PCI_MacIO::readDeviceMem(uint r, uint32 address, uint32 &data, uint size)
 
 bool PCI_MacIO::writeDeviceMem(uint r, uint32 address, uint32 data, uint size)
 {
+    if (r == 0 && address >= 0x12000 && address < 0x12008) {
+        return scc.write(address - 0x12000, data, size);
+    }
 	if (r==0 && address >= 0x8000 && address < 0x8100) {
 		address -= 0x8000;
 		IO_MACIO_TRACE("dbdma: write(%d) @%08x: %08x\n", size, address, data);
@@ -212,4 +235,5 @@ void macio_done()
 
 void macio_init_config()
 {
+    gConfig->acceptConfigEntryStringDef("macio_scc_log", "");
 }

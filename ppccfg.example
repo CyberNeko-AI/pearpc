@@ -156,6 +156,11 @@ pci_usb_installed = 1
 ##
 pci_serial_installed = 0
 
+## MacIO polled SCC console output (independent of the optional PCI UART).
+## Empty disables logging; "-" writes guest serial output to stderr.
+## A filename records serial output there. Receive input and serial DMA are not emulated.
+macio_scc_log = ""
+
 ##
 ##	NVRAM
 ##

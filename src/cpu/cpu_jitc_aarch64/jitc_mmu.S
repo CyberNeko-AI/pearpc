@@ -42,7 +42,9 @@
  *         w1 = value (host-endian) / x1 for dword
  *    OUT: none
  *
- *  Scratch registers (clobbered): x0-x5, x9, x16, x17
+ *  Scratch registers (clobbered): x0-x5, x16, x17
+ *  W9 is preserved across the word slow paths because multi-register
+ *  lmw/stmw instructions reuse it for their faulting PC.
  *  Preserved: x19-x28, x29, x30 (LR saved/restored in slow path)
  *
  *  All slow-path helpers return int: 0 = OK, nonzero = DSI exception.
@@ -253,8 +255,9 @@ do_export EXTERN(ppc_read_effective_word_asm)
     rev     w0, w0                      // BE -> LE
     ret
 .Lread_word_slow:
-    stp     x29, x30, [sp, #-16]!
+    stp     x29, x30, [sp, #-32]!
     mov     x29, sp
+    str     w9, [sp, #16]
     str     w9, [x20, #pc_ofs]
     ldr     w16, [x20, #current_code_base]
     add     w16, w16, w9
@@ -263,9 +266,10 @@ do_export EXTERN(ppc_read_effective_word_asm)
     mov     x0, x20
     bl      EXTERN(ppc_read_effective_word_slow)
     // Check return value: w0 != 0 means DSI
-    cbnz    w0, .Ldsi_from_slow
+    cbnz    w0, .Ldsi_from_word_slow
     ldr     w0, [x20, #temp]
-    ldp     x29, x30, [sp], #16
+    ldr     w9, [sp, #16]
+    ldp     x29, x30, [sp], #32
     ret
 
 
@@ -407,8 +411,9 @@ do_export EXTERN(ppc_write_effective_word_asm)
     str     w17, [x16, x2]
     ret
 .Lwrite_word_slow:
-    stp     x29, x30, [sp, #-16]!
+    stp     x29, x30, [sp, #-32]!
     mov     x29, sp
+    str     w9, [sp, #16]
     str     w9, [x20, #pc_ofs]
     ldr     w16, [x20, #current_code_base]
     add     w16, w16, w9
@@ -418,8 +423,9 @@ do_export EXTERN(ppc_write_effective_word_asm)
     mov     x0, x20
     bl      EXTERN(ppc_write_effective_word_slow)
     // Check return value: w0 != 0 means DSI
-    cbnz    w0, .Ldsi_from_slow
-    ldp     x29, x30, [sp], #16
+    cbnz    w0, .Ldsi_from_word_slow
+    ldr     w9, [sp, #16]
+    ldp     x29, x30, [sp], #32
     ret
 
 
@@ -524,9 +530,15 @@ do_export EXTERN(ppc_opc_icbi_asm)
 //  ppc_exception() already set DAR, DSISR, SRR0/SRR1, MSR, npc.
 //  Clean up the slow-path stack frame and dispatch to npc.
 //
+.Ldsi_from_word_slow:
+    // Word slow paths reserve an extra slot for the preserved W9.
+    ldp     x29, x30, [sp], #32
+    b       .Ldsi_dispatch
+
 .Ldsi_from_slow:
     // Clean up the slow-path stack frame (stp x29, x30 was pushed)
     ldp     x29, x30, [sp], #16
+.Ldsi_dispatch:
     // Dispatch to npc (exception vector).
     ldr     w0, [x20, #npc]
     b       EXTERN(ppc_new_pc_asm)

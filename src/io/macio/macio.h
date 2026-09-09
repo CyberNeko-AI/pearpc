@@ -22,12 +22,16 @@
 #define __IO_MACIO_H__
 
 #include "io/pci/pci.h"
+#include "scc.h"
 
 class PCI_MacIO: public PCI_Device {
+    MacIOSCC scc;
+    FILE *sccLog;
 public:
-			PCI_MacIO();
-	virtual bool	readDeviceMem(uint r, uint32 address, uint32 &data, uint size);
-	virtual bool	writeDeviceMem(uint r, uint32 address, uint32 data, uint size);
+    PCI_MacIO();
+    ~PCI_MacIO() override;
+    bool readDeviceMem(uint r, uint32 address, uint32 &data, uint size) override;
+    bool writeDeviceMem(uint r, uint32 address, uint32 data, uint size) override;
 };
 
 void macio_init();
@@ -35,4 +39,3 @@ void macio_done();
 void macio_init_config();
 
 #endif
-

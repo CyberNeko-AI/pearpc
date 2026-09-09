@@ -208,6 +208,8 @@ Loading XCOFF...
 
 ## kext 后 SystemStarter 挂起研判（2026-09-09）
 
+**后续结论：** 下述定时器分析未能解释最终卡死。进一步通过客体页表、内核符号和异常现场定位到缺少 MacIO SCC，显示模式切换时访问地址 `0x2` 并递归卡住控制台。已补齐 SCC 并完成四种介质组合的图形界面验证，详见 [控制台死锁诊断记录](OSX_CONSOLE_HANG_20260909.md)。
+
 最新现象已越过 PROM、BootX、根分区挂载和 kext 读取，画面停在 `/etc/rc` 调用 `SystemStarter` 附近。aarch64 JIT 采样显示模拟器线程仍在执行，而不是宿主线程死锁；客体 PPC 状态反复位于低地址等待循环，DEC 读取值仍在变化。
 
 此前 macOS 定时器实现每次 `writeDEC` 都取消并重建一个 GCD `dispatch_source`。长时间启动会积累大量已取消的 source，可能造成 DEC 回调延迟或丢失。现改为每个模拟器定时器创建一个持久 source，后续只更新 deadline；删除定时器时统一取消并释放 source 和 queue。

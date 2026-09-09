@@ -80,11 +80,38 @@ Exit code 0 = all tests passed. Nonzero = number of failures.
 | `test_alu.S` | `test_alu.cfg` | 51 ALU tests: addi, addis, add, subf, ori, and, xor, slw, srw, neg, mullw, oris, xori, xoris, or, stw/lwz, stb/lbz, sth/lhz, rlwinm, cmp/branch, mtspr/mfspr, mfcr/cmpwi, mfmsr, mtmsr, mulli, mulhwu, rlwimi, nor, orc, cntlzw, subfic, lwbrx, stwbrx, divwu, addic, adde, subfe, srawi, lwarx/stwcx. reservation semantics. |
 | `test_mem.S` | `test_mem.cfg` | 18 memory tests: word/half/byte store/load, byte-in-word extraction, multi-page stride, 1024-word XOR loop, cross-size access patterns. |
 | `test_dsi.S` | `test_dsi.cfg` | DSI exception handling: installs handler at vector 0x300, accesses unmapped pages to trigger DSI, handler creates PTE and returns via rfi, verifies retry succeeds. Tests lwz/stw/sth/stb/lhz/lbz through DSI-mapped pages. |
+| `test_multiple_dsi.S` | `test_multiple_dsi.cfg` | Cross-page `lmw/stmw`: a successful TLB slow-path call precedes a DSI on the next page. Verifies SRR0, DSISR, retry and transferred data; exit 100 indicates a wrong fault PC. |
 | `test_branch_loop.S` | `test_branch_loop.cfg` | 20 branch tests: counted loops with `bl` calls inside (same-page `ble` + `bl` dispatch), `bdnz`/`bdz`, `bctr`/`bctrl`/`blrl`, conditional `bclr` variants (`beqlr`, `bnelr`, `bltlr`, `bgelr`, `bgtlr`, `blelr`) testing both taken and not-taken paths. |
 | `test_fpu_arith.S` | `test_fpu_arith.cfg` | 48 FPU tests: fabs, fnabs, fadd/fsub/fmul/fdiv (double+single), fmadd/fmsub/fnmadd/fnmsub (double+single), fsqrt, fcmpu, frsp, fctiwz, fsel, lfs/stfs/lfsu/stfsu (single↔double conversion, rA update), FPSCR rounding modes (mffs, mtfsfi, fdiv 10/3 under RN=0/1/2/3, negative under RN=3). |
 | `test_fpu_exc.S` | `test_fpu_exc.cfg` | 24 FPU tests: NO_FPU exception handling (installs handler at 0x800, verifies lfd/fadd/stfd/fdivs/lfs/stfs raise NO_FPU when MSR_FP=0, checks SRR0/SRR1), NO_FPU vs DSI priority, fmr (64-bit copy), fneg (sign bit flip for +val, -val, -0.0). |
 | `test_altivec.S` | `test_altivec.cfg` | 12 AltiVec tests: MSR_VEC enable via rfi, vxor, vspltisw, vspltisb, vadduwm, vsubuwm, vand, vaddubm, vmrghw, vcmpequw. (with CR6), lvx/stvx round-trip, vspltw. |
 | `test_crlogical.S` | `test_crlogical.cfg` | CR logical operations: crand, crandc, cror, crorc, crxor, crnand, crnor, creqv, plus crclr/crset aliases. |
+
+## AArch64 code generation at fragment boundaries
+
+After a normal macOS arm64 build, run:
+
+```sh
+bash test/run_aarch64_codegen_tests.sh
+```
+
+This executes the actual `stwcx.` generator at every aligned fragment boundary,
+with the next fragment 2 MiB ahead or behind. The 3,072 cases check both indexed
+address forms, XER.SO clear/set, absent/matching/stale reservations, CR preservation,
+memory writes and MMU call counts. MMU calls use test doubles; the emitter and
+generated AArch64 instructions are real. Other hosts skip this native execution test.
+
+## MacIO SCC console regression
+
+After configuring the project, run this host test from the repository root:
+
+```sh
+c++ -std=c++11 -DHAVE_CONFIG_H -I. -Isrc test/test_macio_scc.cc src/io/macio/scc.cc -o /tmp/test_macio_scc
+/tmp/test_macio_scc
+```
+
+It exercises the two SCC channels, register selection and reset, baud register readback,
+and Darwin's poll/write/poll console sequence, including captured output bytes.
 
 ## Writing a new test
 

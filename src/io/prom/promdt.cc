@@ -1392,6 +1392,14 @@ void prom_init_device_tree()
 	macio->addProp(new PromPropMemory("ranges", &ranges2, sizeof ranges2));
 	macio->addProp(new PromPropInt("#address-cells", 1));
 	macio->addProp(new PromPropInt("#size-cells", 1));
+    // Darwin's PE_find_scc requires an escc node before initializing its
+    // polled console at MacIO + 0x12000. Display mode changes use this console.
+    PromNode *escc = new PromNode("escc@12000");
+    macio->addNode(escc);
+    macio->addNodeShort("escc", "escc@12000");
+    escc->addProp(new PromPropString("device_type", "escc"));
+    const byte sccReg[] = {0, 1, 0x20, 0, 0, 0, 0, 8};
+    escc->addProp(new PromPropMemory("reg", sccReg, sizeof sccReg));
 /*	
 	PromNode *ata3 = new PromNode("ata-3");
 	macio->addNode(ata3);

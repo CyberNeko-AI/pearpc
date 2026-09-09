@@ -20,6 +20,7 @@ TESTS=(
     test/test_alu.cfg
     test/test_mem.cfg
     test/test_dsi.cfg
+    test/test_multiple_dsi.cfg
     test/test_branch_loop.cfg
     test/test_fpu_exc.cfg
     test/test_fpu_arith.cfg

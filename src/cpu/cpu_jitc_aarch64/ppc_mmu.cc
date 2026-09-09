@@ -2531,9 +2531,6 @@ JITCFlow ppc_opc_gen_stwcx_(JITC &jitc)
     int rS, rA, rB;
     PPC_OPC_TEMPL_X(jitc.current_opc, rS, rA, rB);
     jitc.clobberAll();
-    // Reserve enough space for the entire codegen to avoid fragment
-    // boundaries between forward-branch fixups and their targets.
-    jitc.emitAssure(128);
     gen_prologue(jitc);
 
     // cr &= 0x0FFFFFFF  (clear CR0)
@@ -2578,16 +2575,13 @@ JITCFlow ppc_opc_gen_stwcx_(JITC &jitc)
     // skip_write:
     jitc.asmResolveFixup(bne_fixup);
 
-    // if (xer & XER_SO) cr |= CR_CR0_SO
-    jitc.asmLDRw_cpu(W16, offsetof(PPC_CPU_State, xer));
-    uint so_body = 4 /* LDR cr */ + a64_movw_size(CR_CR0_SO) + 4 /* ORR */ + 4 /* STR */;
-    NativeAddress so_done = jitc.asmHERE() + 4 + so_body;
-    jitc.asmTBZ(W16, 31, 4 + so_body); // skip body
+    // Copy XER.SO (bit 31) into CR0.SO (bit 28) without a short branch:
+    // this sequence may straddle noncontiguous translation fragments.
+    jitc.asmLDRw_cpu(W17, offsetof(PPC_CPU_State, xer));
+    jitc.asmLSRw_imm(W17, W17, 31);
     jitc.asmLDRw_cpu(W16, offsetof(PPC_CPU_State, cr));
-    jitc.asmMOV(W17, (uint32)CR_CR0_SO);
-    jitc.asmORRw(W16, W16, W17);
+    jitc.asmBFIw(W16, W17, 28, 1);
     jitc.asmSTRw_cpu(W16, offsetof(PPC_CPU_State, cr));
-    jitc.asmAssertHERE(so_done, "stwcx_ SO skip");
 
     // done:
     jitc.asmResolveFixup(cbz_fixup);
