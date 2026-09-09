@@ -205,3 +205,11 @@ Loading XCOFF...
 ```
 
 这次验证重点是确认四种介质组合都能到达 BootX 加载阶段；完整进入客体系统仍受实际镜像启动耗时影响。
+
+## kext 后 SystemStarter 挂起研判（2026-09-09）
+
+最新现象已越过 PROM、BootX、根分区挂载和 kext 读取，画面停在 `/etc/rc` 调用 `SystemStarter` 附近。aarch64 JIT 采样显示模拟器线程仍在执行，而不是宿主线程死锁；客体 PPC 状态反复位于低地址等待循环，DEC 读取值仍在变化。
+
+此前 macOS 定时器实现每次 `writeDEC` 都取消并重建一个 GCD `dispatch_source`。长时间启动会积累大量已取消的 source，可能造成 DEC 回调延迟或丢失。现改为每个模拟器定时器创建一个持久 source，后续只更新 deadline；删除定时器时统一取消并释放 source 和 queue。
+
+验证结果：诊断构建运行 90 秒期间 DEC 回调计数从约 500 继续增长到 600 以上，证明定时器没有在长启动阶段停止。当前仍需用用户实际图形配置确认 SystemStarter 是否继续推进；本次测试没有把宿主收到 `SIGTERM` 当作客体崩溃。

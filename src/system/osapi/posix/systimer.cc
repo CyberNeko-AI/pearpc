@@ -58,6 +58,10 @@ struct sys_timer_struct {
     sys_timer_callback callback;
     int clock;
     uint64 timer_res;
+#if defined(__APPLE__) && defined(USE_POSIX_SETITIMER)
+    dispatch_queue_t dispatch_queue;
+    dispatch_source_t dispatch_timer;
+#endif
 
     sys_timer_struct(sys_timer_callback cb) : callback(cb), clock(kClock), timer_res(0)
     {
@@ -120,6 +124,10 @@ bool sys_create_timer(sys_timer *t, sys_timer_callback cb_func)
     newTimer->timer_res += uint64(clockRes.tv_nsec);
 #else
 #ifdef USE_POSIX_SETITIMER
+#if defined(__APPLE__)
+    newTimer->dispatch_queue = NULL;
+    newTimer->dispatch_timer = NULL;
+#endif
     if (gSingleTimer != NULL) {
         ht_printf("There can only be one active sys timer at a time using\n"
                   "interval timers.\n");
@@ -171,6 +179,18 @@ void sys_delete_timer(sys_timer t)
     timer_delete(timer->timer_id);
 #else
 #ifdef USE_POSIX_SETITIMER
+#if defined(__APPLE__)
+    if (timer->dispatch_timer) {
+        dispatch_source_set_event_handler(timer->dispatch_timer, ^{});
+        dispatch_source_cancel(timer->dispatch_timer);
+        dispatch_release(timer->dispatch_timer);
+        timer->dispatch_timer = NULL;
+    }
+    if (timer->dispatch_queue) {
+        dispatch_release(timer->dispatch_queue);
+        timer->dispatch_queue = NULL;
+    }
+#else
     struct itimerval itime;
 
     itime.it_value.tv_sec = 0;
@@ -179,6 +199,7 @@ void sys_delete_timer(sys_timer t)
     itime.it_interval.tv_usec = 0;
 
     setitimer(timer->clock, &itime, NULL);
+#endif
     gSingleTimer = NULL;
 #endif
 #endif
@@ -215,28 +236,22 @@ void sys_set_timer(sys_timer t, time_t secs, long int nanosecs, bool periodic)
 #else
 #ifdef USE_POSIX_SETITIMER
 #if defined(__APPLE__)
-    // macOS: setitimer/SIGALRM is unreliable with multiple threads.
-    // Use dispatch_source one-shot timer instead.
-    {
-        static dispatch_queue_t dsQueue = NULL;
-        static dispatch_source_t dsTimer = NULL;
-        if (!dsQueue) {
-            dsQueue = dispatch_queue_create("pearpc.dec_timer", DISPATCH_QUEUE_SERIAL);
-        }
-        if (dsTimer) {
-            dispatch_source_cancel(dsTimer);
-            dispatch_release(dsTimer);
-            dsTimer = NULL;
-        }
-        dsTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dsQueue);
+    // macOS: use one persistent GCD source and only update its deadline.
+    // Recreating a one-shot source on every DEC write eventually stops
+    // delivering callbacks during long guest boots.
+    if (!timer->dispatch_queue) {
+        timer->dispatch_queue = dispatch_queue_create("pearpc.dec_timer", DISPATCH_QUEUE_SERIAL);
+    }
+    if (!timer->dispatch_timer) {
+        timer->dispatch_timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, timer->dispatch_queue);
         sys_timer_callback cb = timer->callback;
         sys_timer t_copy = reinterpret_cast<sys_timer>(timer);
-        dispatch_source_set_event_handler(dsTimer, ^{ cb(t_copy); });
-        uint64_t interval_ns = (uint64_t)secs * 1000000000ULL + (uint64_t)nanosecs;
-        dispatch_source_set_timer(dsTimer, dispatch_time(DISPATCH_TIME_NOW, interval_ns), DISPATCH_TIME_FOREVER,
-                                  0); // one-shot
-        dispatch_resume(dsTimer);
+        dispatch_source_set_event_handler(timer->dispatch_timer, ^{ cb(t_copy); });
+        dispatch_resume(timer->dispatch_timer);
     }
+    uint64_t interval_ns = (uint64_t)secs * 1000000000ULL + (uint64_t)nanosecs;
+    dispatch_source_set_timer(timer->dispatch_timer, dispatch_time(DISPATCH_TIME_NOW, interval_ns),
+                              periodic ? interval_ns : DISPATCH_TIME_FOREVER, 0);
 #else
     struct itimerval itime;
 
