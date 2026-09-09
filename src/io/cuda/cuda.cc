@@ -699,13 +699,25 @@ void cuda_write(uint32 addr, uint32 data, int size)
 		IO_CUDA_TRACE("->PCR\n");
 		gCUDA.rPCR = data;
 		break;
-    	case IFR:
+    case IFR:
 		IO_CUDA_TRACE("->IFR\n");
-		gCUDA.rIFR = data;
+		// VIA IFR is write-one-to-clear: writing a set bit clears the
+		// corresponding pending flag.  Assignment would incorrectly set
+		// flags requested by the guest and lose unrelated timer/shift flags.
+		gCUDA.rIFR &= (byte)~data;
+		if (!(gCUDA.rIFR & SR_INT)) {
+			pic_cancel_interrupt(IO_PIC_IRQ_CUDA);
+		}
 		break;
-    	case IER:
+    case IER:
 		IO_CUDA_TRACE("->IER\n");
-		gCUDA.rIER = data;
+		// Bit 7 selects set (1) versus clear (0); only bits 0..6 are
+		// interrupt enables.  This is the 6522/VIA programming model.
+		if (data & IER_SET) {
+			gCUDA.rIER |= data & 0x7f;
+		} else {
+			gCUDA.rIER &= (byte)~data;
+		}
 		break;
     	case ANH:
 		IO_CUDA_TRACE("->ANH\n");
@@ -725,7 +737,10 @@ void cuda_read(uint32 addr, uint32 &data, int size)
 	IO_CUDA_TRACE("%d read word @%08x\n", gCUDA.state, addr);
 	uint32 reg = addr - IO_CUDA_PA_START;
 	if (reg != 0x1a00 /* IFR */ && cuda_ifr_read_count > 100) {
-		IO_CUDA_WARN("broke out of IFR loop after %d reads, now reading reg %04x\n",
+		// Polling IFR until an ADB transfer completes is normal CUDA/VIA
+		// behaviour.  Keep this as trace-only diagnostics so ordinary boots
+		// do not report a false warning for a bounded polling loop.
+		IO_CUDA_TRACE("left IFR poll after %d reads, now reading reg %04x\n",
 			cuda_ifr_read_count, reg);
 		cuda_ifr_read_count = 0;
 	}
@@ -815,6 +830,9 @@ void cuda_read(uint32 addr, uint32 &data, int size)
 	case IFR:
 		cuda_ifr_read_count++;
 		data = gCUDA.rIFR;
+		if (gCUDA.rIFR & gCUDA.rIER) {
+			data |= 0x80; // IFR bit 7 is the interrupt summary flag.
+		}
 		if (gCUDA.state == cuda_idle) {
 			if (!gCUDA.left /*&& !(gCUDA.rIER & SR_INT)*/) {
 //				if (cuda_interrupt()) {

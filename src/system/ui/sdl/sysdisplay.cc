@@ -119,7 +119,16 @@ void SDLSystemDisplay::displayShow()
 	// might set gDamageAreaFirstAddr, gDamageAreaLastAddr.
 	// We can't use mutexes in gcard for speed reasons. So we'll
 	// try to minimize the probability of loosing the race.
-	if (gDamageAreaFirstAddr <= gDamageAreaLastAddr+3 && mSDLFrameBuffer) {
+	if (gDamageAreaFirstAddr > gDamageAreaLastAddr+3) {
+		// Avoid submitting an unchanged frame.  On the Metal backend
+		// SDL_RenderPresent may block in CAMetalLayer::nextDrawable while
+		// waiting for a free drawable, which would also delay input events
+		// because rendering runs on the SDL event thread.
+		sys_unlock_mutex(mRedrawMutex);
+		return;
+	}
+
+	if (mSDLFrameBuffer) {
 		int damageAreaFirstAddr = gDamageAreaFirstAddr;
 		int damageAreaLastAddr = gDamageAreaLastAddr;
 		healFrameBuffer();
@@ -147,9 +156,9 @@ void SDLSystemDisplay::displayShow()
 			mClientChar.width * mSDLChar.bytesPerPixel);
 	}
 
-	// Always clear+render+present every frame to keep the
-	// Metal compositor happy (backbuffer contents are undefined
-	// after SDL_RenderPresent).
+	// Clear and redraw the complete texture whenever the guest framebuffer
+	// changed.  The previous implementation did this on every timer tick,
+	// even when there was no damage, needlessly blocking in Metal.
 	SDL_RenderClear(gSDLRenderer);
 	SDL_RenderTexture(gSDLRenderer, gSDLTexture, NULL, NULL);
 	SDL_RenderPresent(gSDLRenderer);

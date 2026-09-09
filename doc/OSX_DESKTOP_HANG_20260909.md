@@ -102,3 +102,17 @@ bash test/run_tests.sh
 本轮证据保存在 `/tmp/pearpc-stwcx-fix/`。后续用户报告首次设置中文输入法加载后变慢，快速鼠标运动会伴随 CUDA 超时。宿主 `sample` 采样显示 CPU 线程约 80% 占用，其中约一半样本位于 `jitcNewPC` 的翻译路径，CUDA 事件线程并非主要耗时来源。
 
 性能修复让 word MMU 慢速桩保存/恢复 W9，使 `lmw/stmw` 恢复为每条指令一次序言；DSI 分支为新增的 32 字节栈帧使用独立回收路径。修复后本机代码生成边界测试 3,072 次、PPC ELF 测试 13 项全部通过。CUDA 的 IFR 轮询和事件超时 warning 仍保留为后续可观测性问题；应先重启新构建的模拟器再比较输入法加载和鼠标运动性能。
+
+随后在用户保持运行的桌面进程上读取 JIT 计数，发现 `destroy_oopages` 已达数千万，而 `destroy_ootc` 仍为 0。原因是 `jitcCreateClientPage()` 在没有空闲页槽时连续淘汰五个 LRU 页，却只把第一个重新映射到新客户机页；四个额外页面被清空后继续占据 LRU，令有效工作集快速缩水并触发重复编译。修复后每次只淘汰并重新映射一个 LRU 页。需要重启模拟器后再比较计数和中文输入法页面的响应速度。
+
+### 2026-09-09 Metal 提交卡顿复核
+
+对进入桌面的 `ppc` 进程做了两次各 3 秒的 `sample`。CPU 线程大部分时间停在 `cpu_doze` 的有界等待，仅少量样本进入 `jitcNewPC` 编译路径；CUDA 线程处于条件变量等待。相反，SDL 主线程在 2 次采样中分别有 145/869 个样本进入 `SDL_RenderPresent`，其中 129/850 个样本阻塞于 `CAMetalLayer::nextDrawable` 的信号量等待。该路径运行在 SDL 事件线程，会延迟鼠标和菜单事件处理。
+
+`SDLSystemDisplay::displayShow()` 原先每个 16 ms 定时器 tick 都执行清屏、纹理绘制和 `SDL_RenderPresent`，即使客户机帧缓冲没有变化。现已改为仅在检测到显存损坏时提交；窗口收到 `SDL_EVENT_WINDOW_EXPOSED` 时先标记整帧损坏再刷新，以保留遮挡恢复能力。编译和 `test/run_aarch64_codegen_tests.sh`（3072 个 `stwcx.` 边界测试）均通过。
+
+### CUDA/L2CR warning 说明与修复
+
+启动时的 `mfspr` 警告对应 SPR 1017（L2CR）。Mac OS X 会探测该可选二级缓存控制寄存器；PearPC 将其作为“缓存关闭”返回 0，因此不会改变地址转换或设备访问。已取消该探测的重复 warning。
+
+CUDA 的 `IFR` 连续读取是 ADB 驱动等待移位寄存器中断的轮询。访问 `0x1c00` 是 VIA 的 IER（中断使能寄存器），不是设备故障的直接证据；但原实现把 IFR 当普通寄存器覆盖、把 IER 当普通值写入，和 6522 规则不符。现已实现 IFR 写一清、IER bit7 选择置位/清除，并在 IFR bit7 返回“已使能中断摘要”。轮询计数降为 trace 级别，避免正常等待显示为 warning。

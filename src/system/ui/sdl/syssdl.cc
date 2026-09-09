@@ -92,6 +92,9 @@ static bool handleSDLEvent(const SDL_Event &event)
 		return true;
 	}
 	case SDL_EVENT_WINDOW_EXPOSED:
+		// The compositor may discard the backbuffer while the window is
+		// covered.  Force a full texture upload and present on expose.
+		damageFrameBufferAll();
 		gDisplay->displayShow();
 		return true;
 	case SDL_EVENT_KEY_UP: {

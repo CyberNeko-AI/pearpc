@@ -977,20 +977,11 @@ static ClientPage *jitcCreateClientPage(JITC &jitc, uint32 baseaddr)
         }
         cp->moreRU = NULL;
     } else {
+        // Reuse exactly one LRU page. The old five-page sweep destroyed
+        // four additional pages without remapping them, shrinking the
+        // effective translated working set and causing constant recompiles.
         cp = jitc.LRUpage;
         jitcDestroyAndTouchClientPage(jitc, cp);
-        if (jitc.LRUpage) {
-            jitcDestroyAndTouchClientPage(jitc, jitc.LRUpage);
-        }
-        if (jitc.LRUpage) {
-            jitcDestroyAndTouchClientPage(jitc, jitc.LRUpage);
-        }
-        if (jitc.LRUpage) {
-            jitcDestroyAndTouchClientPage(jitc, jitc.LRUpage);
-        }
-        if (jitc.LRUpage) {
-            jitcDestroyAndTouchClientPage(jitc, jitc.LRUpage);
-        }
     }
     jitcMapClientPage(jitc, baseaddr, cp);
     return cp;

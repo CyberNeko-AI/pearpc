@@ -3711,7 +3711,9 @@ int ppc_opc_mfspr(PPC_CPU_State &aCPU)
         case 22: aCPU.gpr[rD] = 0; return 0;
         case 23: aCPU.gpr[rD] = 0; return 0;
         case 25:
-            PPC_OPC_WARN("read from spr %d:%d (L2CR) not supported! (from %08x)\n", spr1, spr2, aCPU.pc);
+            // L2CR is optional on the emulated CPU.  Returning zero reports
+            // the cache as disabled, which is the architecturally safe
+            // result for probing code; avoid warning on every OS probe.
             aCPU.gpr[rD] = 0;
             return 0;
         case 27:
